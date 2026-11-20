@@ -33,3 +33,28 @@ Rust evaluation: not needed — a working C driver already exists and the missin
 1. A first (cheapest, and it tells us whether the firmware matches): enable the driver built-in, add `touchscreen@4b` on the right I2C bus with this phone's supplies, boot, read `/dev/input/event*`.
 2. If events are wrong or missing, switch to B; fall back to A+ / C only with evidence.
 3. Later (not part of this driver): wake gestures, palm/glove/edge rejection, suspend/resume, calibration.
+
+
+## RESULT (2026-11-21): touchscreen works on mainline with the 2026 TouchComm driver (path B)
+**Path A (existing `synaptics_s3908`, built in, node copied from the 8T): detected the chip but unusable.** Probe OK ("Synaptics TCM Oncell Touchscreen", i2c-13/13-004b, max 8639x19199),
+IRQ fires, but every report is rejected: `invalid touch report length`. Cause: the driver hardcodes ONE touch-report layout (its own comment says other report configs would need
+dynamic parsing); this phone's firmware (`s3908PR0-15.0`, TouchComm v1) uses another layout.
+**Path B (`synaptics_tcm_i2c`, Vsevolod Nevorotov's 2026-09-10 series, imported from lore `20260910070723.347768-1-sevanevorotov29@gmail.com`): works.**
+`TouchComm v1, mode 0x01, part s3908PR0-15.0`, `8640x19200, 10 touch objects`, input device "Synaptics TouchComm Touchscreen" (event3). Measured with tools/bitra-evtest: ~3100-4600 frames per 30-45 s capture,
+all 10 MT slots used, X 0..8639 and Y 162/377..19199 (edge to edge), tracking ids start/release in balance, smooth coordinate streams, no kernel warnings from the driver. Pressure stays 0 (this report layout carries no Z).
+Upstream review state: Tested-by: Frieder Hannenheim (OnePlus 8T, S3908, "wake from suspend works"; no wake when the screen is off but the device is not suspended — he points to David Heidelberg's ft5x06 double-tap series).
+Our tree: branch `bitra` carries the import (unmodified commit 83e846480) + a hardening commit (below) + the DTS node. The old driver stays in the tree but is disabled in our config (both bind `syna,s3908`).
+### DT differences vs the old driver / the 8T
+- New binding (`syna,s3908`): `vdd-supply` (3.0 V) and **`avdd-supply` (1.8 V)**, optional `wakeup-source`; the old binding used `vdd` + `vcc`. With `vcc` the new driver warns `supply avdd not found, using dummy regulator` and the chip never answers (`failed to write command 0x02: -110`).
+- This phone: vdd = `vreg_l11c_3p0` (pm8150a_l11), avdd = `vreg_l1c_1p8` (pm8150a_l1), irq tlmm 39 level-low, reset tlmm 38 active-low, `clock-frequency = <400000>` on `&i2c13`, pinctrl `ts_int_default`/`ts_rst_suspend`.
+### Review of the automated review (sashiko) of the posting — checked against the code and the vendor reference
+1. "continued read skips the final chunk when payload_len == 60": **not a bug** — the vendor driver counts the padding byte inside the message and also skips the read when only the padding byte remains.
+2. "non-last chunks read 63 instead of 64 bytes": **undetermined** (vendor reads rd_chunk_size = 64 per chunk, i.e. 62 payload bytes; this driver reads 63). Never hit by ordinary touch reports (< 60 bytes). Left unchanged; verify with a long report (e.g. gesture/diagnostic) if it ever matters.
+3. "unbounded active-object count / 32-bit overflow in syna_get_bits": **real in principle** (needs a misbehaving controller). Fixed: 64-bit bounds check; `active` clamped to max_objects. (Object *index* was already range-checked.)
+4. "unbalanced regulator disable if recovery power-up fails": **real**. Fixed with a `powered` flag. (Commit 54f0bd481; compile-clean at W=1, checkpatch clean; retested on the phone after the change.)
+Worth upstreaming these fixes to the author.
+### Tool bug worth remembering
+`bitra-evtest` first showed 0 events even while the driver decoded touches: my `pollfd` had a 64-bit fd, so `ppoll` never saw the requested events. Fixed (struct { int fd; short events, revents; }).
+### Not done / open
+Suspend/resume and wake gestures (double-tap) untested; `wakeup-source` is set in the DT. Palm/edge rejection, glove mode, curved-screen grip handling from the vendor driver are not implemented (userspace/libinput does basic palm handling).
+Pressure/size: `TOUCH_MAJOR` max is 4095 here; width fields only. Coordinate range is in chip units (libinput scales from the absinfo range). Check the axis orientation against the panel (swap/invert) when a UI runs.

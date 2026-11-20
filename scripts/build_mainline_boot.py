@@ -122,13 +122,21 @@ def alpine_entries():
         else:
             ents.append((rel, _st.S_IFREG | (0o755 if f.stat().st_mode & 0o111 else 0o644), f.read_bytes(), None))
     return ents
+def build_evtest_tool():
+    out = Path(tempfile.mkdtemp()) / "bitra-evtest"
+    subprocess.run([str(CLANG), "--target=aarch64-linux-gnu", "-static", "-nostdlib", "-ffreestanding", "-fno-stack-protector",
+                    "-O2", "-fuse-ld=lld", "-D__linux__", "-D__user=", "-Wno-#warnings",
+                    f"-I{LINUX}/include/uapi", f"-I{LINUX}/arch/arm64/include/uapi", f"-I{OUT}/arch/arm64/include/generated/uapi",
+                    "-o", str(out), str(ROOT / "tools/bitra-evtest.c")], check=True)
+    return out.read_bytes()
 _helper = build_reboot_helper()
 _drm = build_drm_tool()
+_evtest = build_evtest_tool()
 _orig_cpio = b.cpio_newc
 def _cpio(entries):
     import stat as _st
     X = _st.S_IFREG | 0o755
-    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
 b.cpio_newc = _cpio
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]

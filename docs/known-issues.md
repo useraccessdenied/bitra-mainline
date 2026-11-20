@@ -24,3 +24,8 @@ Logged 2026-11-21. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (s
 - Wi-Fi: no OEM board data (BDF) used yet; generic board-2.bin worked. Check power/suspend, regulatory (self-managed US), roaming, coex with Bluetooth.
 - Bluetooth: LE scanning unverified; pairing/A2DP/audio not tried; needs bluetoothd (dbus) or a tty-capable btmgmt in the initramfs.
 - Alpine package index signature is not verified by scripts/fetch_alpine_pkgs.py (checksums only).
+
+## Touchscreen (2026-11-21)
+- Works (docs/22). Open: suspend/resume + double-tap wake untested; no wake while the screen is off but the system is not suspended (same as upstream review note); axis orientation vs the panel not yet verified in a UI; no pressure value in this report layout.
+- The unmerged `synaptics_tcm_i2c` driver (and my hardening commit) should go back to the author / linux-input; the old `synaptics_s3908` stays disabled in our config (same compatible).
+- ABL-agnostic tool note: tools/bitra-evtest.c had a pollfd layout bug (fixed).
