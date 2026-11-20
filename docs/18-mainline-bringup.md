@@ -115,3 +115,11 @@ SCSI_UFS_QCOM, BLK_DEV_SD, PHY_QCOM_QMP_UFS). RAM boot only, nothing mounted, ev
   read through mainline UFS match the backup hashes: 15/15.
 - Caveat: ufshcd performs a few standard device query writes during init (e.g. attributes/flags such as bActiveICCLevel, fDeviceInit); these are not verified/undone — nothing indicates a problem.
 - Next: read-only mount of `persist` (sda2, ext4, `-o ro,noload`) to read the real Wi-Fi MAC and Bluetooth address instead of the placeholders.
+
+## `persist` read-only mount (2026-11-21)
+`mount -t ext4 -o ro,noload,nodev,nosuid,noexec /dev/sda2` worked (block device kept read-only; unmounted afterwards). Contents (names only; fingerprint/camera data not copied):
+bdwlan.elf (57,908 B, ELF32: the OEM Wi-Fi board data), regdb.bin (19,348 B), wlan/WCNSS_qcom_cfg.ini, cnss_diag*.conf, camera/ (OTP/EEPROM/calibration), fingerprint/jiiov/, sensors/, rfs/, hlos_rfs/, secnvm/, time/, data/ (hashed names),
+.fsec/.foxs, *_version files.
+- **No plain Wi-Fi MAC or Bluetooth address file in persist.** Stock uses `use-nv-mac` (MAC from modem NV via cnss/QMI) and Android generates/stores the BT address elsewhere (oplusreserve* / properties).
+  The placeholders (Wi-Fi 00:03:7f:12:42:42, BT temporary 02:b1:7a:05:5a:ad) stay until the real values are read from the running Droidian (`/sys/class/net/wlan0/address`, `hciconfig`) or a persistent random address scheme is chosen.
+- `bdwlan.elf` + `regdb.bin` copied to roms/mainline/stock/persist/ (untracked) for a later conversion of the OEM board data into an ath11k `board-2.bin` entry (ath11k-bdencoder), which should give the OEM TX-power/regulatory tuning instead of the generic board file.
