@@ -1,7 +1,7 @@
 From 9a616e34e143e69a5855c9926f1ca180ff4353d7 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 00:52:56 +0530
-Subject: [PATCH 01/11] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
+Subject: [PATCH 01/14] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
  shim, permanent efifb console
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -339,7 +339,7 @@ index 3d060d599..7bc261d7b 100644
 From 4f0778d7b3004ac95f9b16313eba79f7f61b1dde Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:23:37 +0530
-Subject: [PATCH 02/11] Add AI_DISCLOSURE.md and ATTRIBUTION.md
+Subject: [PATCH 02/14] Add AI_DISCLOSURE.md and ATTRIBUTION.md
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 ---
@@ -390,7 +390,7 @@ index 000000000..0b55ca1b4
 From cae53d2a60c454d4bc61b8f17e99a970c9512349 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:41:01 +0530
-Subject: [PATCH 03/11] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
+Subject: [PATCH 03/14] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
  cmd-mode driver; enable display pipeline and PON reboot modes in the bitra
  DTS
 
@@ -872,7 +872,7 @@ index 000000000..317110a16
 From 7d3ecada4e400091bdf07248f4283b98e3795397 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:05:20 +0530
-Subject: [PATCH 04/11] ams662zs01: select panel refresh from the active mode;
+Subject: [PATCH 04/14] ams662zs01: select panel refresh from the active mode;
  extra blanking on the 120 Hz mode to raise the DSI link rate
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -962,7 +962,7 @@ index 317110a16..c275bf445 100644
 From d952ec9a35f02236f7ed785e8ed9b8c0c81618f0 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:21:01 +0530
-Subject: [PATCH 05/11] bitra DTS: enable PCIe0 + QCA6390 Wi-Fi, PMU 0.95 V
+Subject: [PATCH 05/14] bitra DTS: enable PCIe0 + QCA6390 Wi-Fi, PMU 0.95 V
  rails from pm8150 s6 (smpf2 has no RPMh address here)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -1004,7 +1004,7 @@ index 0b42bfb0a..4cf0ffcd0 100644
 From c4b257f83f3b53476d9d0d1a9ae0983af5401a16 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:39:57 +0530
-Subject: [PATCH 06/11] bitra DTS: temporary local-bd-address for the QCA6390
+Subject: [PATCH 06/14] bitra DTS: temporary local-bd-address for the QCA6390
  Bluetooth controller
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -1038,7 +1038,7 @@ index 4cf0ffcd0..8778e00a4 100644
 From 02b0c9d65ac5be5a2090c5eb0ec3afa297ae9a93 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:48:28 +0530
-Subject: [PATCH 07/11] ams662zs01: power the panel down if the PPS transfer
+Subject: [PATCH 07/14] ams662zs01: power the panel down if the PPS transfer
  fails; drop the connector pointer on remove
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -1076,7 +1076,7 @@ index c275bf445..b2cd36d4c 100644
 From 2c670a5497f534788a71b3e5f31eebe262a31e28 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:58:34 +0530
-Subject: [PATCH 08/11] bitra DTS: enable UFS (host + PHY) after the read-only
+Subject: [PATCH 08/14] bitra DTS: enable UFS (host + PHY) after the read-only
  probe verified it
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -1106,7 +1106,7 @@ index 8778e00a4..312692c04 100644
 From 83e8464809160a26a0585983194e6d05d08a8406 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 03:19:13 +0530
-Subject: [PATCH 09/11] Input: synaptics_tcm_i2c - add Synaptics TouchComm I2C
+Subject: [PATCH 09/14] Input: synaptics_tcm_i2c - add Synaptics TouchComm I2C
  touchscreen driver (as posted by Vsevolod Nevorotov, 2026-09-10, unmerged)
 
 Imported unmodified from the linux-input posting (20260910070723.347768-3-sevanevorotov29@gmail.com) for testing on the realme GT Neo 2; Makefile hunk re-done by hand.
@@ -2204,7 +2204,7 @@ index 000000000..2553dabd3
 From 54f0bd481dd7c2547a021278f257f286d4846d36 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 03:28:31 +0530
-Subject: [PATCH 10/11] synaptics_tcm_i2c: harden against issues raised in the
+Subject: [PATCH 10/14] synaptics_tcm_i2c: harden against issues raised in the
  automated review of the posting
 
 - syna_get_bits(): do the bounds check in 64 bits so offset + bits cannot wrap.
@@ -2275,7 +2275,7 @@ index 2553dabd3..24e753c42 100644
 From 4dbb0bd0e9f01390d624626d4a0768b6aa90d828 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 03:31:56 +0530
-Subject: [PATCH 11/11] bitra DTS: Synaptics S3908 touchscreen on i2c13 (vdd =
+Subject: [PATCH 11/14] bitra DTS: Synaptics S3908 touchscreen on i2c13 (vdd =
  l11c 3.0 V, avdd = l1c 1.8 V, irq tlmm39, reset tlmm38)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -2314,6 +2314,126 @@ index 312692c04..7a8ceefea 100644
 +		pinctrl-names = "default";
 +	};
 +};
+-- 
+2.56.0
+
+
+From ee1805433e00e3709c8a9999f979e9a1c27dabe0 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 04:08:34 +0530
+Subject: [PATCH 12/14] usb: typec: zero the altmode descriptor in
+ typec_port_register_altmodes()
+
+desc was left uninitialised on the stack; only svid, vdo and mode are set before it is passed to typec_port_register_altmode(), which copies desc->mode_selection (a bool) and desc->roles. UBSAN on a KASAN/UBSAN debug kernel (realme GT Neo 2, qcom pmic-typec):
+  UBSAN: invalid-load in drivers/usb/typec/class.c:658: load of value 128 is not a valid value for type 'bool'
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/usb/typec/class.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/typec/class.c b/drivers/usb/typec/class.c
+index 0595e8cb8..7bb491ddc 100644
+--- a/drivers/usb/typec/class.c
++++ b/drivers/usb/typec/class.c
+@@ -2613,7 +2613,7 @@ void typec_port_register_altmodes(struct typec_port *port,
+ 	struct typec_altmode **altmodes, size_t n)
+ {
+ 	struct fwnode_handle *child;
+-	struct typec_altmode_desc desc;
++	struct typec_altmode_desc desc = { };
+ 	struct typec_altmode *alt;
+ 	size_t index = 0;
+ 	u16 svid;
+-- 
+2.56.0
+
+
+From fba17282e19f93f4c6b2080e4fcee785173da189 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 04:08:34 +0530
+Subject: [PATCH 13/14] drm/msm/dpu: free the self-refresh helper data when the
+ DRM device goes away
+
+dpu_crtc_init() calls drm_self_refresh_helper_init() but nothing called drm_self_refresh_helper_cleanup(), leaking one 512-byte drm_self_refresh_data per CRTC every time the DRM device is torn down and brought up again (panel/DSI unbind + bind). kmemleak after 50 bring-ups: 100 objects, all from drm_self_refresh_helper_init <- dpu_crtc_init <- dpu_kms_hw_init. Release it with a drmm action registered after the CRTC's own managed cleanup.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c
+index 42d0a529b..8ba3e583a 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c
+@@ -15,6 +15,7 @@
+ #include <drm/drm_atomic.h>
+ #include <drm/drm_blend.h>
+ #include <drm/drm_crtc.h>
++#include <drm/drm_managed.h>
+ #include <drm/drm_flip_work.h>
+ #include <drm/drm_framebuffer.h>
+ #include <drm/drm_mode.h>
+@@ -1875,6 +1876,11 @@ static const struct drm_crtc_helper_funcs dpu_crtc_helper_funcs = {
+  *
+  * initialize CRTC
+  */
++static void dpu_crtc_self_refresh_cleanup(struct drm_device *dev, void *ptr)
++{
++	drm_self_refresh_helper_cleanup(ptr);
++}
++
+ struct drm_crtc *dpu_crtc_init(struct drm_device *dev, struct drm_plane *plane,
+ 				struct drm_plane *cursor)
+ {
+@@ -1936,6 +1942,11 @@ struct drm_crtc *dpu_crtc_init(struct drm_device *dev, struct drm_plane *plane,
+ 		return ERR_PTR(ret);
+ 	}
+ 
++	/* The helper's data is never freed otherwise: 512 bytes leaked per CRTC on every DRM device teardown */
++	ret = drmm_add_action_or_reset(crtc->dev, dpu_crtc_self_refresh_cleanup, crtc);
++	if (ret)
++		return ERR_PTR(ret);
++
+ 	DRM_DEBUG_KMS("%s: successfully initialized crtc\n", dpu_crtc->name);
+ 	return crtc;
+ }
+-- 
+2.56.0
+
+
+From 50c10c1c47410ac45bacd2c943f385b1e850ca9a Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 04:08:35 +0530
+Subject: [PATCH 14/14] watchdog: qcom: mark an already-armed watchdog as
+ running at probe
+
+When the bootloader leaves the apps watchdog enabled, tell the watchdog core (WDOG_HW_RUNNING) so it keeps petting it until userspace opens the device. Without it a slow boot (e.g. a KASAN/lockdep kernel) is reset by the bootloader's watchdog before init runs.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/watchdog/qcom-wdt.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
+index 49bd04841..c533737a6 100644
+--- a/drivers/watchdog/qcom-wdt.c
++++ b/drivers/watchdog/qcom-wdt.c
+@@ -333,6 +333,14 @@ static int qcom_wdt_probe(struct platform_device *pdev)
+ 		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
+ 	}
+ 
++	/*
++	 * The bootloader (ABL on the realme GT Neo 2) leaves the watchdog armed. Tell the core so that
++	 * it keeps petting it from here on (watchdog.handle_boot_enabled) until userspace takes over;
++	 * otherwise a slow boot, e.g. a KASAN/lockdep kernel, gets reset before init runs.
++	 */
++	if (readl(wdt_addr(wdt, WDT_EN)) & QCOM_WDT_ENABLE)
++		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
++
+ 	ret = devm_watchdog_register_device(dev, &wdt->wdd);
+ 	if (ret)
+ 		return ret;
 -- 
 2.56.0
 

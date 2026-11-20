@@ -136,7 +136,7 @@ _orig_cpio = b.cpio_newc
 def _cpio(entries):
     import stat as _st
     X = _st.S_IFREG | 0o755
-    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/soak.sh", X, (ROOT / "tools/soak.sh").read_bytes(), None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
 b.cpio_newc = _cpio
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]
