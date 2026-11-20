@@ -12,3 +12,5 @@ Status: mainline 7.2.0 RAM-boots with USB NCM shell (stage 1). See `docs/18-main
 - Boot via `ssh mac to-fastboot` from the running OS (a key-combo fastboot makes the OPLUS ABL refuse images).
 
 Everything is experimental and AI-assisted (see AI_DISCLOSURE.md). RAM boots only; never flash from here without a backup.
+
+- `docs/21-ufs.md` — UFS storage on mainline; `docs/22-touchscreen.md` — touchscreen research and effort estimate; `docs/known-issues.md` — open items.
