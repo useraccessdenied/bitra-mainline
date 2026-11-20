@@ -50,4 +50,12 @@ Debug images: releases/mainline-debug/ (untracked). The stock FDT (`roms/mainlin
   same DSC PPS (slice 540x30, 8 bpp), modes 120 Hz (hfp 50) and 60 Hz (hfp 540), supplies vddio=l14a 1.8 V, vdd=l13a 3.0 V (VCI),
   vddr=l2c 1.2 V, reset GPIO 75 (active-low in DT), AVDD gpio via pinctrl (gpio8 'panel_vout'), TE GPIO 66, backlight DCS 0..2047.
   Pixelworks Iris5 runs in "soft" mode (`pxlw,soft-iris-enable`): DSI goes straight to the panel (to be confirmed on hardware).
-- Untested on hardware at the time of writing.
+
+## RESULT: display works on mainline (2026-11-21, t-d1)
+Booting with the panel driver and the display pipeline enabled: msm drm 1.13 initialises (DPU rev 0x60000000), the DSI panel binds
+(`ae94000.dsi.0` backlight 0..2047), connector `DSI-1` connected/enabled with 1080x2400, fbdev `msmdrmfb` (stride **4352**, 32 bpp).
+Verified on the panel with solid white and R/G/B bars written to /dev/fb0 (colour order correct for XRGB8888 bytes B,G,R,X;
+rows must be 4352 bytes apart). Backlight sysfs brightness works. Known noise: WARNs from the DSI PHY probe
+(`DSI PLL(0) lock failed`, `dsi0_phy_pll_out_dsiclk already disabled`) during `of_clk_add_hw_provider` reparenting — harmless so far, to be cleaned up.
+Not yet checked: 60 Hz mode switch, ESD/TE behaviour, fbcon text rendering (`sys_imageblit: framebuffer is not in virtual address space`
+warning from fbcon on msmdrmfb), suspend/resume of the panel.

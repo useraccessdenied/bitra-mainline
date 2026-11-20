@@ -24,6 +24,9 @@ b.INIT = b.INIT.replace(
 # pet the ABL-armed watchdog from the first instruction of init; report USB bring-up state
 b.INIT = b.INIT.replace('log() { echo "bitra-debug: $*" > /dev/kmsg; echo "bitra-debug: $*"; }',
     'log() { echo "<2>bitra-debug: $*" > /dev/kmsg; }')
+# keep /dev/watchdog0 open (a close-per-pet logs 'watchdog did not stop!' on the console every 4 s)
+b.INIT = b.INIT.replace('( while :; do echo . > /dev/watchdog0 2>/dev/null || echo . > /dev/watchdog 2>/dev/null; sleep 4; done ) &',
+    '( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &')
 b.INIT = b.INIT.replace('/bin/busybox --install -s /bin 2>/dev/null',
     '/bin/busybox --install -s /bin 2>/dev/null\n'
     'mount -t devtmpfs devtmpfs /dev 2>/dev/null\n'
