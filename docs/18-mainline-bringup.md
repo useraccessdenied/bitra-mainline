@@ -72,3 +72,19 @@ page-flips an animation and reports the real rate from flip-complete events (`v`
 - Result: 120 Hz mode 120.5 fps (vblank 120.5), 60 Hz mode 60.3 fps (vblank 60.3); 8 rapid 120<->60 switches clean, no new kernel errors.
 - Initramfs holds /dev/watchdog0 open: the per-pet "watchdog did not stop!" messages are gone. `to-fastboot` works from a mainline session
   (PMIC PON reboot-mode + tools/bitra-reboot.c), so the dev loop needs no key presses.
+
+## RESULT: Wi-Fi works (QCA6390 / ath11k) — scan finds the home APs (2026-11-21, t-w4)
+`wlan0` appears, firmware 0x10121492 (2021-11-04, generic linux-firmware amss/m3/board-2, no OEM BDF needed so far), `iw dev wlan0 scan`
+returned 15 BSS incl. the owner's 2.4 GHz (ch 10, -46 dBm) and 5 GHz (ch 52, -63 dBm) APs. Not yet: association/WPA, throughput, suspend, MAC (`use-nv-mac`:
+the default 00:03:7f:12:42:42 placeholder is used), Bluetooth.
+Gotchas found on the way (each was a hard stop):
+1. `qca6390-pmu` waited on `regulators-2/smps2`: "could not find RPMh address for resource smpf2" — the OnePlus tree takes the PMU's 0.95 V
+   rails from PM8009 smpf2, which has no RPMh address on this phone. Stock cnss uses pm8150_s6 (aon 0.95 V), s4 (1.8 V io), s5 (1.9 V), pm8150a_s8 (1.3 V):
+   the bitra DTS points `vddpmu`/`vddrfa0p95` at `vreg_s6a_0p95`.
+2. `pwrseq-qcom_wcn`: "cannot find GPIO chip gpiolib_shared.proxy.N" — GPIO 21 (bt-enable) is referenced by the PMU and the BT node, so gpiolib-shared
+   makes a proxy device; it needs `CONFIG_GPIO_SHARED_PROXY=y` (it was =m, no module loader in the initramfs).
+3. ath11k/cfg80211/mac80211 must be built in (CONFIG_RFKILL=y so CFG80211 can be y); firmware is put into the initramfs by scripts/build_mainline_boot.py
+   (decompressed from the host's linux-firmware; generic board-2.bin worked).
+4. Wireless userspace: scripts/fetch_alpine_pkgs.py downloads iw + wpa_supplicant (+musl, libnl3, openssl, dbus-libs, pcsc-lite-libs) from Alpine with checksum
+   verification into third_party/alpine (gitignored); the initramfs build adds them. (APKINDEX signature itself is not verified.)
+Kernel config snapshot: configs/bitra_defconfig (savedefconfig of the working build; apply on top of the omnipha defconfig via `make bitra_defconfig` after copying to arch/arm64/configs/).

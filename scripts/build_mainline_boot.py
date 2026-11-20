@@ -73,13 +73,58 @@ def build_drm_tool():
                     f"-I{LINUX}/include/uapi", f"-I{LINUX}/arch/arm64/include/uapi", f"-I{OUT}/arch/arm64/include/generated/uapi",
                     "-o", str(out), str(ROOT / "tools/bitra-drm.c")], check=True)
     return out.read_bytes()
+import lzma
+FW_ROOT = Path(os.environ.get("FIRMWARE_DIR", "/usr/lib/firmware"))
+FW_FILES = ["regulatory.db", "regulatory.db.p7s", "ath11k/QCA6390/hw2.0/amss.bin", "ath11k/QCA6390/hw2.0/m3.bin", "ath11k/QCA6390/hw2.0/board-2.bin",
+            "qca/htbtfw20.tlv", "qca/htnv20.bin"]
+def firmware_entries():
+    import stat as _st
+    D, F = _st.S_IFDIR | 0o755, _st.S_IFREG | 0o644
+    ents, dirs = [], set()
+    for rel in FW_FILES:
+        src = FW_ROOT / (rel + ".xz")
+        data = lzma.open(src).read() if src.exists() else (FW_ROOT / rel).read_bytes()
+        parts = ("lib/firmware/" + rel).split("/")
+        for i in range(1, len(parts)):
+            d = "/".join(parts[:i])
+            if d not in dirs:
+                dirs.add(d); ents.append((d, D, None, None))
+        ents.append(("lib/firmware/" + rel, F, data, None))
+    return ents
+ALPINE_ROOT = Path(os.environ.get("ALPINE_ROOT", ROOT / "third_party/alpine/root"))
+ALPINE_KEEP = ("lib/", "usr/lib/lib", "sbin/wpa_supplicant", "sbin/wpa_cli", "usr/sbin/iw")
+def alpine_entries():
+    """musl + iw + wpa_supplicant (+libs) from scripts/fetch_alpine_pkgs.py; empty if not fetched."""
+    import stat as _st
+    if not ALPINE_ROOT.exists():
+        return []
+    D = _st.S_IFDIR | 0o755
+    ents, dirs = [], set()
+    for f in sorted(ALPINE_ROOT.rglob("*")):
+        rel = str(f.relative_to(ALPINE_ROOT))
+        if not f.is_symlink() and not f.is_file():
+            continue
+        if not rel.startswith(ALPINE_KEEP) or "engines-3" in rel or "ossl-modules" in rel:
+            continue
+        parts = rel.split("/")
+        for i in range(1, len(parts)):
+            d = "/".join(parts[:i])
+            if d not in dirs and d not in ("lib", "usr", "sbin"):
+                dirs.add(d); ents.append((d, D, None, None))
+            elif d in ("lib", "usr", "sbin") and d not in dirs:
+                dirs.add(d); ents.append((d, D, None, None))
+        if f.is_symlink():
+            ents.append((rel, _st.S_IFLNK | 0o777, os.readlink(f).encode(), None))
+        else:
+            ents.append((rel, _st.S_IFREG | (0o755 if f.stat().st_mode & 0o111 else 0o644), f.read_bytes(), None))
+    return ents
 _helper = build_reboot_helper()
 _drm = build_drm_tool()
 _orig_cpio = b.cpio_newc
 def _cpio(entries):
     import stat as _st
     X = _st.S_IFREG | 0o755
-    return _orig_cpio(entries + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
 b.cpio_newc = _cpio
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]

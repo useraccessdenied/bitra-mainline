@@ -1,7 +1,7 @@
 From 9a616e34e143e69a5855c9926f1ca180ff4353d7 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 00:52:56 +0530
-Subject: [PATCH 1/4] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
+Subject: [PATCH 1/5] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
  shim, permanent efifb console
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -339,7 +339,7 @@ index 3d060d599..7bc261d7b 100644
 From 4f0778d7b3004ac95f9b16313eba79f7f61b1dde Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:23:37 +0530
-Subject: [PATCH 2/4] Add AI_DISCLOSURE.md and ATTRIBUTION.md
+Subject: [PATCH 2/5] Add AI_DISCLOSURE.md and ATTRIBUTION.md
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 ---
@@ -390,7 +390,7 @@ index 000000000..0b55ca1b4
 From cae53d2a60c454d4bc61b8f17e99a970c9512349 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:41:01 +0530
-Subject: [PATCH 3/4] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
+Subject: [PATCH 3/5] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
  cmd-mode driver; enable display pipeline and PON reboot modes in the bitra
  DTS
 
@@ -872,7 +872,7 @@ index 000000000..317110a16
 From 7d3ecada4e400091bdf07248f4283b98e3795397 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:05:20 +0530
-Subject: [PATCH 4/4] ams662zs01: select panel refresh from the active mode;
+Subject: [PATCH 4/5] ams662zs01: select panel refresh from the active mode;
  extra blanking on the 120 Hz mode to raise the DSI link rate
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -955,6 +955,48 @@ index 317110a16..c275bf445 100644
  	/* 120 Hz first (preferred); the mode switch itself is a one-register write, see ams662zs01_on() */
  	count += drm_connector_helper_get_modes_fixed(connector, &ams662zs01_120_mode);
  	count += drm_connector_helper_get_modes_fixed(connector, &ams662zs01_60_mode);
+-- 
+2.56.0
+
+
+From d952ec9a35f02236f7ed785e8ed9b8c0c81618f0 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 02:21:01 +0530
+Subject: [PATCH 5/5] bitra DTS: enable PCIe0 + QCA6390 Wi-Fi, PMU 0.95 V rails
+ from pm8150 s6 (smpf2 has no RPMh address here)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 0b42bfb0a..4cf0ffcd0 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -50,8 +50,6 @@ &framebuffer {
+ &mdss_dp { status = "disabled"; };
+ &gpu { status = "disabled"; };
+ &gmu { status = "disabled"; };
+-&pcie0 { status = "disabled"; };
+-&pcie0_phy { status = "disabled"; };
+ &pcie2 { status = "disabled"; };
+ &pcie2_phy { status = "disabled"; };
+ &pm8150l_flash { status = "disabled"; };
+@@ -89,3 +87,13 @@ &pon {
+ 	mode-bootloader = <0x2>;
+ 	mode-recovery = <0x1>;
+ };
++
++/*
++ * Wi-Fi/BT PMU: the OnePlus tree takes the 0.95 V PMU rails from PM8009 smpf2, which has no RPMh address on this phone
++ * ("could not find RPMh address for resource smpf2"). The stock cnss node powers the chip from pm8150_s6 (aon, 0.95 V),
++ * pm8150_s4 (1.8 V io), pm8150_s5 (1.9 V rfa1) and pm8150a_s8 (1.3 V rfa2): use s6 for the two 0.95 V inputs as well.
++ */
++&qca6390_pmu {
++	vddpmu-supply = <&vreg_s6a_0p95>;
++	vddrfa0p95-supply = <&vreg_s6a_0p95>;
++};
 -- 
 2.56.0
 

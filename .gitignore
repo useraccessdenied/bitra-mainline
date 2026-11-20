@@ -6,4 +6,5 @@
 !/docs/
 !/scripts/
 !/patches/
+!/tools/
 __pycache__/
