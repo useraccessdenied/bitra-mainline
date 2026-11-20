@@ -1,7 +1,7 @@
 From 9a616e34e143e69a5855c9926f1ca180ff4353d7 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 00:52:56 +0530
-Subject: [PATCH 1/5] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
+Subject: [PATCH 1/6] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
  shim, permanent efifb console
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -339,7 +339,7 @@ index 3d060d599..7bc261d7b 100644
 From 4f0778d7b3004ac95f9b16313eba79f7f61b1dde Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:23:37 +0530
-Subject: [PATCH 2/5] Add AI_DISCLOSURE.md and ATTRIBUTION.md
+Subject: [PATCH 2/6] Add AI_DISCLOSURE.md and ATTRIBUTION.md
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 ---
@@ -390,7 +390,7 @@ index 000000000..0b55ca1b4
 From cae53d2a60c454d4bc61b8f17e99a970c9512349 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:41:01 +0530
-Subject: [PATCH 3/5] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
+Subject: [PATCH 3/6] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
  cmd-mode driver; enable display pipeline and PON reboot modes in the bitra
  DTS
 
@@ -872,7 +872,7 @@ index 000000000..317110a16
 From 7d3ecada4e400091bdf07248f4283b98e3795397 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:05:20 +0530
-Subject: [PATCH 4/5] ams662zs01: select panel refresh from the active mode;
+Subject: [PATCH 4/6] ams662zs01: select panel refresh from the active mode;
  extra blanking on the 120 Hz mode to raise the DSI link rate
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -962,7 +962,7 @@ index 317110a16..c275bf445 100644
 From d952ec9a35f02236f7ed785e8ed9b8c0c81618f0 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:21:01 +0530
-Subject: [PATCH 5/5] bitra DTS: enable PCIe0 + QCA6390 Wi-Fi, PMU 0.95 V rails
+Subject: [PATCH 5/6] bitra DTS: enable PCIe0 + QCA6390 Wi-Fi, PMU 0.95 V rails
  from pm8150 s6 (smpf2 has no RPMh address here)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -996,6 +996,40 @@ index 0b42bfb0a..4cf0ffcd0 100644
 +&qca6390_pmu {
 +	vddpmu-supply = <&vreg_s6a_0p95>;
 +	vddrfa0p95-supply = <&vreg_s6a_0p95>;
++};
+-- 
+2.56.0
+
+
+From c4b257f83f3b53476d9d0d1a9ae0983af5401a16 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 02:39:57 +0530
+Subject: [PATCH 6/6] bitra DTS: temporary local-bd-address for the QCA6390
+ Bluetooth controller
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 4cf0ffcd0..8778e00a4 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -97,3 +97,14 @@ &qca6390_pmu {
+ 	vddpmu-supply = <&vreg_s6a_0p95>;
+ 	vddrfa0p95-supply = <&vreg_s6a_0p95>;
+ };
++
++/*
++ * The QCA6390 comes up with the placeholder address 00:00:00:00:5a:ad, which the kernel treats as "unconfigured".
++ * Android keeps the real address in vendor storage (persist); until that is read, use a locally administered one.
++ * TEMPORARY: replace with the address read from persist (or generated once and stored).
++ */
++&uart6 {
++	bluetooth {
++		local-bd-address = [ ad 5a 05 7a b1 02 ];	/* 02:b1:7a:05:5a:ad, stored little-endian */
++	};
 +};
 -- 
 2.56.0

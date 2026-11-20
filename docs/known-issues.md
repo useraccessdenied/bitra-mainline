@@ -17,3 +17,10 @@ Logged 2026-11-21. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (s
   audio, modem (external SDX55M over PCIe/MHI), sensors, camera. See docs/20 (in this repo) for the order.
 - ABL only accepts Droidian's DTB carrier + kernel-side DTB shim (CONFIG_BITRA_DTB_SHIM); a U-Boot stage would remove it.
 - `fastboot` entered with hardware keys makes ABL refuse images ("Load Error"); use `to-fastboot` from the running OS.
+
+## Connectivity (2026-11-21)
+- Wi-Fi: scan stuck ("Resource busy") after switching networks with `wpa_cli select_network`; recover with `ip link set wlan0 down/up`. Investigate (ath11k scan abort after roam/disconnect).
+- Wi-Fi: real MAC (use-nv-mac) and Bluetooth BD address are not read from vendor storage; both use placeholders/temporary values.
+- Wi-Fi: no OEM board data (BDF) used yet; generic board-2.bin worked. Check power/suspend, regulatory (self-managed US), roaming, coex with Bluetooth.
+- Bluetooth: LE scanning unverified; pairing/A2DP/audio not tried; needs bluetoothd (dbus) or a tty-capable btmgmt in the initramfs.
+- Alpine package index signature is not verified by scripts/fetch_alpine_pkgs.py (checksums only).

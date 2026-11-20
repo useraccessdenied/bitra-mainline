@@ -92,7 +92,8 @@ def firmware_entries():
         ents.append(("lib/firmware/" + rel, F, data, None))
     return ents
 ALPINE_ROOT = Path(os.environ.get("ALPINE_ROOT", ROOT / "third_party/alpine/root"))
-ALPINE_KEEP = ("lib/", "usr/lib/lib", "sbin/wpa_supplicant", "sbin/wpa_cli", "usr/sbin/iw")
+ALPINE_LIBS = ("libc.musl", "libnl-", "libssl", "libcrypto", "libdbus", "libpcsclite", "libudev")
+ALPINE_KEEP = ("lib/", "usr/lib/lib", "sbin/wpa_supplicant", "sbin/wpa_cli", "usr/sbin/iw", "usr/bin/hci", "usr/bin/rfcomm", "usr/bin/sdptool")
 def alpine_entries():
     """musl + iw + wpa_supplicant (+libs) from scripts/fetch_alpine_pkgs.py; empty if not fetched."""
     import stat as _st
@@ -106,6 +107,9 @@ def alpine_entries():
             continue
         if not rel.startswith(ALPINE_KEEP) or "engines-3" in rel or "ossl-modules" in rel:
             continue
+        base = rel.rsplit("/", 1)[-1]
+        if "/lib" in "/" + rel and base.startswith("lib") and not base.startswith(ALPINE_LIBS):
+            continue	# glib/gio/util-linux etc. come in as dependency noise; the bluez tools are static
         parts = rel.split("/")
         for i in range(1, len(parts)):
             d = "/".join(parts[:i])

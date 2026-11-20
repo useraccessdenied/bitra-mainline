@@ -88,3 +88,19 @@ Gotchas found on the way (each was a hard stop):
 4. Wireless userspace: scripts/fetch_alpine_pkgs.py downloads iw + wpa_supplicant (+musl, libnl3, openssl, dbus-libs, pcsc-lite-libs) from Alpine with checksum
    verification into third_party/alpine (gitignored); the initramfs build adds them. (APKINDEX signature itself is not verified.)
 Kernel config snapshot: configs/bitra_defconfig (savedefconfig of the working build; apply on top of the omnipha defconfig via `make bitra_defconfig` after copying to arch/arm64/configs/).
+
+## RESULT: Wi-Fi association + throughput, Bluetooth controller (2026-11-21, t-w4 / t-b2)
+**Wi-Fi** (QCA6390, ath11k, generic firmware): both home APs connect from the initramfs with `wpa_supplicant` + busybox `udhcpc`.
+- Kapil2.4G (WPA2-PSK, ch 10): -53 dBm, TX 216 Mbit/s, 50 MB download in 8.7 s (~46 Mbit/s).
+- Kapil-5G (**WPA3-only: SAE, MFP required**, ch 52 DFS, 80 MHz, 2x2 VHT): -64 dBm, TX 351-527 / RX 585 Mbit/s, 50 MB in 3.6-5.4 s (74-110 Mbit/s; internet/CDN-bound).
+  SAE needs the plaintext passphrase in `sae_password=` (a pre-hashed PSK only works for WPA2). Never commit the config; the initramfs does not contain it
+  (stage it with the agent and `put` it to /tmp). The agent's Mac staging dir (data/stage) keeps a copy: delete it after use.
+- Quirks: (a) a `wpa_cli select_network` switch between networks left the driver reporting "Resource busy (-16)" for every scan until `ip link set wlan0 down/up`;
+  (b) the radio is a "self-managed" regulatory phy (firmware says country US) so `country=IN` in wpa_supplicant is ignored; (c) router DNS refused `example.com` but resolved others (router issue);
+  (d) MAC is the ath11k placeholder 00:03:7f:12:42:42 (`use-nv-mac` in stock: real MAC lives in vendor NV).
+**Bluetooth** (QCA6390 over uart6 `ttyHS1`, hci_qca + pwrseq): `hci0: setting up ROME/QCA6390`, `qca/htbtfw20.tlv` + `qca/htnv20.bin` download, `QCA setup on UART is completed`.
+- The controller reports the placeholder address 00:00:00:00:5a:ad (kernel: "unconfigured", `DOWN RAW`): a TEMPORARY `local-bd-address` in the DTS makes it `UP RUNNING`.
+  The real address must come from vendor storage (persist) or be generated once and stored.
+- Classic inquiry works (`hcitool scan` found the owner's other phone). LE scanning is NOT verified: `hcitool lescan` fails ("Set scan parameters failed: I/O error", BT5 controllers want the
+  extended-scan commands) and raw extended scan via `hcitool cmd` + `hcidump` returned no reports (inconclusive). `btmgmt` needs a tty; a proper test wants bluetoothd/bluetoothctl.
+- Tools: Alpine `bluez-deprecated` (hciconfig/hcitool/hcidump are static) needs `libudev.so.1` (eudev-libs); `btmgmt` needs readline+ncurses (pushed by hand, not in the image).

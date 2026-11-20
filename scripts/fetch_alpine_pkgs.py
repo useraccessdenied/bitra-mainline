@@ -99,7 +99,10 @@ def main():
         for m in tf.getmembers():
             if m.name.startswith(".") or "/man/" in m.name or "/doc/" in m.name or m.name.startswith("usr/share/"):
                 continue
-            tf.extract(m, root, filter="tar")
+            try:
+                tf.extract(m, root, filter="tar")
+            except (tarfile.FilterError, OSError) as e:	# e.g. absolute symlinks (bin/sh -> /usr/bin/busybox): not needed
+                print(f"  skipped {m.name}: {type(e).__name__}", file=sys.stderr)
         print(f"ok {fn} ({url}) checksum verified")
     print("extracted to", root)
 
