@@ -47,6 +47,30 @@ b.INIT = b.INIT.replace('mount -t devtmpfs devtmpfs /dev 2>/dev/null\n',
     'mount -t devtmpfs devtmpfs /dev 2>/dev/null\n'
     "printf '#!/bin/busybox sh\\nexec /bin/busybox ash\\n' > /bin/bash; chmod +x /bin/bash\n"
     'mkdir -p /usr/local/sbin; ln -sf /bin/busybox /usr/local/sbin/busybox-bitra\n', 1)
+# reboot-to-bootloader support: tiny static helper + a systemctl shim, so the agent's to-fastboot/reboot/state work here
+import subprocess, tempfile
+CLANG = BITRA / "roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin/clang"
+def build_reboot_helper():
+    out = Path(tempfile.mkdtemp()) / "bitra-reboot"
+    subprocess.run([str(CLANG), "--target=aarch64-linux-gnu", "-static", "-nostdlib", "-ffreestanding", "-fno-stack-protector",
+                    "-O2", "-fuse-ld=lld", "-o", str(out), str(ROOT / "tools/bitra-reboot.c")], check=True)
+    return out.read_bytes()
+SYSTEMCTL_SHIM = b'''#!/bin/busybox sh
+case "$*" in
+  *reboot-argument=bootloader*) exec /bin/bitra-reboot bootloader ;;
+  *reboot-argument=recovery*) exec /bin/bitra-reboot recovery ;;
+  reboot*|*" reboot"*) exec /bin/bitra-reboot ;;
+  *is-system-running*) echo running ;;
+esac
+exit 0
+'''
+_helper = build_reboot_helper()
+_orig_cpio = b.cpio_newc
+def _cpio(entries):
+    import stat as _st
+    X = _st.S_IFREG | 0o755
+    return _orig_cpio(entries + [("bin/bitra-reboot", X, _helper, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+b.cpio_newc = _cpio
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]
 extra = "clk_ignore_unused pd_ignore_unused panic=0 consoleblank=0 earlycon=efifb keep_bootcon fw_devlink.sync_state=strict loglevel=4"

@@ -39,3 +39,15 @@ Mainline 7.2.0 runs on the phone from a `fastboot boot` RAM image: 8 CPUs up, dw
 UFS (read-only first; pmOS warns UFS bring-up with non-vendor kernels erased a Sony), display panel (Samsung
 AMS662ZS01 DSC cmd-mode) so a real console exists, touch, regulators/PMIC, remoteprocs, Wi-Fi, modem (IMEI-safe rmtfs).
 Debug images: releases/mainline-debug/ (untracked). The stock FDT (`roms/mainline/stock/`) contains the device serial: never commit.
+
+## Update: agent control + panel driver (2026-11-21)
+- The initramfs now serves DHCP (192.168.2.20-30) so the Mac needs no sudo, runs telnetd on :23, provides a `bash` shim (the agent's
+  `exec bash || exec sh` kills busybox ash), `/usr/local/sbin/busybox-bitra` (agent file transfer), and a `systemctl` shim +
+  `bitra-reboot` helper (tools/bitra-reboot.c, freestanding; reboot(2) with an argument) so the agent's `to-fastboot`/`reboot`/`state`
+  work. `reboot bootloader` relies on the PMIC PON reboot-mode (`&pon { mode-bootloader = <0x2>; }`, CONFIG_POWER_RESET_QCOM_PON=y).
+- New panel driver `drivers/gpu/drm/panel/panel-samsung-ams662zs01.c` (derived from the sibling OnePlus 8T AMB655X driver): stock DCS init
+  sequence decoded from the vendor DT (script: parse `qcom,mdss-dsi-on-command` blobs: [dtype,last,vc,ack,wait,len16,payload...]),
+  same DSC PPS (slice 540x30, 8 bpp), modes 120 Hz (hfp 50) and 60 Hz (hfp 540), supplies vddio=l14a 1.8 V, vdd=l13a 3.0 V (VCI),
+  vddr=l2c 1.2 V, reset GPIO 75 (active-low in DT), AVDD gpio via pinctrl (gpio8 'panel_vout'), TE GPIO 66, backlight DCS 0..2047.
+  Pixelworks Iris5 runs in "soft" mode (`pxlw,soft-iris-enable`): DSI goes straight to the panel (to be confirmed on hardware).
+- Untested on hardware at the time of writing.

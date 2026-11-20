@@ -1,0 +1,870 @@
+From 9a616e34e143e69a5855c9926f1ca180ff4353d7 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 00:52:56 +0530
+Subject: [PATCH 1/3] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
+ shim, permanent efifb console
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/Kconfig                            |  6 ++
+ arch/arm64/boot/dts/qcom/Makefile             |  2 +
+ .../boot/dts/qcom/sm8250-realme-bitra.dts     | 78 ++++++++++++++++
+ arch/arm64/kernel/Makefile                    |  4 +
+ arch/arm64/kernel/bitra-dtb-blob.S            |  8 ++
+ arch/arm64/kernel/bitra-dtb-shim.c            | 90 +++++++++++++++++++
+ arch/arm64/kernel/setup.c                     |  9 ++
+ drivers/firmware/efi/earlycon.c               | 30 +++++++
+ 8 files changed, 227 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+ create mode 100644 arch/arm64/kernel/bitra-dtb-blob.S
+ create mode 100644 arch/arm64/kernel/bitra-dtb-shim.c
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b3afe0688..9a866f13e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1,4 +1,10 @@
+ # SPDX-License-Identifier: GPL-2.0-only
++config BITRA_DTB_SHIM
++	bool "realme GT Neo 2 bring-up: swap in embedded DTB (ABL only accepts the stock tree)"
++	depends on ARM64 && OF
++	help
++	  Bring-up only; see arch/arm64/kernel/bitra-dtb-shim.c.
++
+ config ARM64
+ 	def_bool y
+ 	select ACPI_APMT if ACPI
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index e2aff0b3b..b51ac20de 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -359,6 +359,8 @@ dtb-$(CONFIG_ARCH_QCOM) += sm8250-lenovo-q706f.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sm8250-mtp.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sm8250-oneplus-instantnoodlep.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sm8250-oneplus-kebab.dtb
++dtb-$(CONFIG_ARCH_QCOM)	+= sm8250-realme-bitra.dtb
++DTC_FLAGS_sm8250-realme-bitra := -@
+ dtb-$(CONFIG_ARCH_QCOM)	+= sm8250-samsung-r8q.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sm8250-samsung-x1q.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sm8250-sony-xperia-edo-pdx203.dtb
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+new file mode 100644
+index 000000000..09eff2c73
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -0,0 +1,78 @@
++// SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
++/*
++ * realme GT Neo 2 (bitra, RMX3366) - stage-1 bring-up tree.
++ * Boots from RAM via `fastboot boot` and gives a USB NCM debug shell.
++ * Reuses the OnePlus common description: the ABL memory map of this phone
++ * is identical (checked against /sys/firmware/fdt of the stock kernel).
++ * Everything that can touch persistent storage or needs unported panel
++ * drivers is disabled until it has been verified.
++ */
++#include "sm8250-oneplus-common.dtsi"
++
++/ {
++	model = "realme GT Neo 2";
++	compatible = "realme,bitra", "qcom,sm8250", "qcom,kona";
++
++	/*
++	 * ABL matches the appended DTB on msm-id/board-id and merges the dtbo overlay chosen by
++	 * oplus,dtsi_no. Keep these identical to the stock base kona tree (see docs/18).
++	 */
++	qcom,msm-id = <QCOM_ID_SM8250 0x20001>;
++	qcom,board-id = <0x10008 0x0>;
++	oplus,dtsi_no = <0x4e5d 0x4ea7 0x4ec1 0x4f7f 0x546f 0x5473 0x5477 0x54e5>;
++
++	/* ABL looks up the node by the exact path /memory; use the layout of the stock kernel (iomem) */
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x80000000 0x0 0x39900000>,
++		      <0x0 0xc0000000 0x2 0xc0000000>;
++	};
++};
++
++/delete-node/ &{/memory@80000000};
++
++/ {
++	chosen {
++		/* ABL rewrites this in place; it refuses trees whose /chosen has no bootargs */
++		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7 kasan_multi_shot";
++	};
++};
++
++&framebuffer {
++	width = <1080>;
++	height = <2400>;
++	stride = <(1080 * 4)>;
++};
++
++/* Stage 1: never touch storage, display pipeline, GPU, PCIe or remoteprocs */
++&ufs_mem_hc { status = "disabled"; };
++&ufs_mem_phy { status = "disabled"; };
++&mdss { status = "disabled"; };
++&mdss_dp { status = "disabled"; };
++&mdss_dsi0 { status = "disabled"; };
++&mdss_dsi0_phy { status = "disabled"; };
++&gpu { status = "disabled"; };
++&gmu { status = "disabled"; };
++&pcie0 { status = "disabled"; };
++&pcie0_phy { status = "disabled"; };
++&pcie2 { status = "disabled"; };
++&pcie2_phy { status = "disabled"; };
++&pm8150l_flash { status = "disabled"; };
++
++/* USB: force gadget mode, no Type-C role switch needed for the debug link */
++&usb_1_dwc3 {
++	dr_mode = "peripheral";
++	/delete-property/ usb-role-switch;
++};
++
++&usb_1_qmpphy {
++	/delete-property/ mode-switch;
++};
++
++/*
++ * Match the stock 4.19 ramoops zone layout (it also carves 0x1000 for devinfo) so that
++ * after a crash the Droidian kernel can read mainline's console log from /sys/fs/pstore.
++ */
++&ramoops {
++	reg = <0x0 0xb0000000 0x0 0x3ff000>;
++};
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index d2690c3ec..62820b380 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -87,3 +87,7 @@ endif
+ 
+ # for cleaning
+ subdir- += vdso vdso32
++
++obj-$(CONFIG_BITRA_DTB_SHIM)		+= bitra-dtb-shim.o bitra-dtb-blob.o
++AFLAGS_bitra-dtb-blob.o			:= -I$(objtree)
++$(obj)/bitra-dtb-blob.o: $(objtree)/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dtb
+diff --git a/arch/arm64/kernel/bitra-dtb-blob.S b/arch/arm64/kernel/bitra-dtb-blob.S
+new file mode 100644
+index 000000000..516272269
+--- /dev/null
++++ b/arch/arm64/kernel/bitra-dtb-blob.S
+@@ -0,0 +1,8 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++	.section .rodata, "a"
++	.balign 8
++	.globl bitra_dtb_start
++bitra_dtb_start:
++	.incbin "arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dtb"
++	.globl bitra_dtb_end
++bitra_dtb_end:
+diff --git a/arch/arm64/kernel/bitra-dtb-shim.c b/arch/arm64/kernel/bitra-dtb-shim.c
+new file mode 100644
+index 000000000..acbf615fd
+--- /dev/null
++++ b/arch/arm64/kernel/bitra-dtb-shim.c
+@@ -0,0 +1,90 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * realme GT Neo 2 (bitra) bring-up shim.
++ *
++ * The OPLUS ABL only accepts an appended DTB that it can merge the vendor dtbo
++ * overlay into (matching msm-id/board-id/oplus,dtsi_no, plus the downstream
++ * __symbols__ the overlay references). A mainline tree cannot satisfy that, so
++ * the boot image carries the stock merged tree for ABL and the kernel swaps in
++ * the embedded mainline tree here, keeping only what ABL computed at runtime
++ * (/chosen: bootargs, initrd range, rng/kaslr seeds).
++ *
++ * Bring-up only. It goes away once a U-Boot stage hands Linux a proper DTB.
++ */
++#include <linux/init.h>
++#include <linux/libfdt.h>
++#include <linux/string.h>
++#include <linux/sizes.h>
++#include <linux/printk.h>
++#include <linux/sysfb.h>
++#include <linux/screen_info.h>
++#include <linux/io.h>
++#include <linux/sizes.h>
++
++#define BITRA_FB_BASE	0x9c000000UL
++#define BITRA_FB_W	1080
++#define BITRA_FB_H	2400
++
++/* Paint the top rows of ABL's panel buffer so we can see the kernel was entered. */
++static void __init bitra_fb_beacon(u32 argb)
++{
++	u32 *p;
++	int row, rows = 40;
++	size_t chunk = BITRA_FB_W * 4 * rows;
++
++	p = early_memremap(BITRA_FB_BASE, chunk);
++	if (!p)
++		return;
++	for (row = 0; row < BITRA_FB_W * rows; row++)
++		p[row] = argb;
++	early_memunmap(p, chunk);
++}
++
++extern const u8 bitra_dtb_start[], bitra_dtb_end[];
++
++static u8 bitra_dtb_buf[SZ_512K] __aligned(8);
++
++void *__init bitra_dtb_shim(void *abl_fdt)
++{
++	static const char *const props[] = {
++		"bootargs", "linux,initrd-start", "linux,initrd-end",
++		"rng-seed", "kaslr-seed",
++	};
++	int src, dst, i, len;
++	const void *val;
++
++	bitra_fb_beacon(0xff00ff00);	/* green: kernel entered */
++
++	/* describe ABL's panel buffer to the EFI-framebuffer earlycon (earlycon=efifb) */
++	sysfb_primary_display.screen = (struct screen_info) {
++		.orig_video_isVGA = VIDEO_TYPE_EFI,
++		.lfb_base = BITRA_FB_BASE,
++		.lfb_width = BITRA_FB_W,
++		.lfb_height = BITRA_FB_H,
++		.lfb_depth = 32,
++		.lfb_linelength = BITRA_FB_W * 4,
++		.lfb_size = BITRA_FB_W * 4 * BITRA_FB_H,
++		.red_size = 8, .red_pos = 16, .green_size = 8, .green_pos = 8,
++		.blue_size = 8, .blue_pos = 0,
++	};
++
++	if (fdt_check_header(bitra_dtb_start) ||
++	    fdt_totalsize(bitra_dtb_start) > sizeof(bitra_dtb_buf))
++		return abl_fdt;
++
++	memcpy(bitra_dtb_buf, bitra_dtb_start, fdt_totalsize(bitra_dtb_start));
++	if (fdt_open_into(bitra_dtb_buf, bitra_dtb_buf, sizeof(bitra_dtb_buf)))
++		return abl_fdt;
++
++	src = fdt_path_offset(abl_fdt, "/chosen");
++	dst = fdt_path_offset(bitra_dtb_buf, "/chosen");
++	if (src < 0 || dst < 0)
++		return abl_fdt;
++
++	for (i = 0; i < ARRAY_SIZE(props); i++) {
++		val = fdt_getprop(abl_fdt, src, props[i], &len);
++		if (val)
++			fdt_setprop(bitra_dtb_buf, dst, props[i], val, len);
++	}
++	return bitra_dtb_buf;
++}
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 23c05dc7a..c88707f49 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -167,6 +167,10 @@ static void __init smp_build_mpidr_hash(void)
+ 		pr_warn("Large number of MPIDR hash buckets detected\n");
+ }
+ 
++#ifdef CONFIG_BITRA_DTB_SHIM
++void *__init bitra_dtb_shim(void *abl_fdt);
++#endif
++
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	int size = 0;
+@@ -176,6 +180,11 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ 	if (dt_virt)
+ 		memblock_reserve(dt_phys, size);
+ 
++#ifdef CONFIG_BITRA_DTB_SHIM
++	if (dt_virt)
++		dt_virt = bitra_dtb_shim(dt_virt);
++#endif
++
+ 	/*
+ 	 * dt_virt is a fixmap address, hence __pa(dt_virt) can't be used.
+ 	 * Pass dt_phys directly.
+diff --git a/drivers/firmware/efi/earlycon.c b/drivers/firmware/efi/earlycon.c
+index 3d060d599..7bc261d7b 100644
+--- a/drivers/firmware/efi/earlycon.c
++++ b/drivers/firmware/efi/earlycon.c
+@@ -37,6 +37,9 @@ static int __init efi_earlycon_remap_fb(void)
+ 	/* bail if there is no bootconsole or it was unregistered already */
+ 	if (!earlycon_console || !console_is_registered(earlycon_console))
+ 		return 0;
++#ifdef CONFIG_BITRA_DTB_SHIM
++	/* bring-up: the mapping is kept for the permanent console below */
++#endif
+ 
+ 	efi_fb = memremap(fb_base, si->lfb_size, fb_wb ? MEMREMAP_WB : MEMREMAP_WC);
+ 
+@@ -47,6 +50,10 @@ early_initcall(efi_earlycon_remap_fb);
+ static int __init efi_earlycon_unmap_fb(void)
+ {
+ 	/* unmap the bootconsole fb unless keep_bootcon left it registered */
++#ifdef CONFIG_BITRA_DTB_SHIM
++	if (efi_fb)
++		return 0;	/* bring-up: permanent console keeps the mapping */
++#endif
+ 	if (efi_fb && !console_is_registered(earlycon_console))
+ 		memunmap(efi_fb);
+ 	return 0;
+@@ -273,3 +280,26 @@ static int __init efi_earlycon_setup(struct earlycon_device *device,
+ 	return 0;
+ }
+ EARLYCON_DECLARE(efifb, efi_earlycon_setup);
++
++#ifdef CONFIG_BITRA_DTB_SHIM
++/*
++ * Bring-up only: the efifb earlycon is a boot console and is torn down at late init,
++ * which hides everything printed after ~11 s on a phone without UART access.
++ * Register the same writer as a normal console so the panel keeps showing the log.
++ */
++static struct console bitra_efifb_console = {
++	.name	= "bitrafb",
++	.write	= efi_earlycon_write,
++	.flags	= CON_ENABLED,
++	.index	= -1,
++};
++
++static int __init bitra_efifb_console_init(void)
++{
++	if (!efi_fb || !earlycon_console)
++		return 0;
++	register_console(&bitra_efifb_console);
++	return 0;
++}
++late_initcall(bitra_efifb_console_init);
++#endif
+-- 
+2.56.0
+
+
+From 4f0778d7b3004ac95f9b16313eba79f7f61b1dde Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 01:23:37 +0530
+Subject: [PATCH 2/3] Add AI_DISCLOSURE.md and ATTRIBUTION.md
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ AI_DISCLOSURE.md | 11 +++++++++++
+ ATTRIBUTION.md   | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
+ create mode 100644 AI_DISCLOSURE.md
+ create mode 100644 ATTRIBUTION.md
+
+diff --git a/AI_DISCLOSURE.md b/AI_DISCLOSURE.md
+new file mode 100644
+index 000000000..1c5eb4306
+--- /dev/null
++++ b/AI_DISCLOSURE.md
+@@ -0,0 +1,11 @@
++# AI usage disclosure
++
++The `bitra` branch of this fork (realme GT Neo 2 bring-up: device tree, ABL DTB shim, debug console patches and
++future drivers) was developed with substantial assistance from an AI coding assistant (Claude Code by Anthropic),
++directed by the repository owner: research, code and patch authoring, build debugging and documentation.
++
++- **Experimental and only partly tested on hardware; provided as-is, without warranty.** Booting custom kernels can
++  lose data; the tested path is RAM-only (`fastboot boot`).
++- AI-assisted commits carry a `Co-Authored-By: Claude` trailer. Code and comments may be wrong or out of date; verify.
++- The AI did not flash any device; any flashing is done manually by the owner.
++- Code written here that touches subsystem code is intended for upstreaming only after human review.
+diff --git a/ATTRIBUTION.md b/ATTRIBUTION.md
+new file mode 100644
+index 000000000..0b55ca1b4
+--- /dev/null
++++ b/ATTRIBUTION.md
+@@ -0,0 +1,11 @@
++# Attribution
++
++This fork only adds commits on branch `bitra`. All other code, history and authorship are from upstream.
++
++| Component | Credit |
++|---|---|
++| Linux kernel | Linus Torvalds and contributors, GPL-2.0 |
++| SM8250 mainline base tree (7.2.0, tag `sm8250-7.2.0_git20261010`) | the Nura (formerly postmarketOS) SM8250 kernel maintainers (https://gitlab.nura.eco/soc/qualcomm-sm8250/linux) |
++| OnePlus 8 Pro measured changes and `omnipha` branch | omnipha — https://github.com/omnipha/linux-qualcomm-sm8250 (this fork's parent) |
++| `sm8250-oneplus-common.dtsi` / kebab (reused for the memory map) | the OnePlus SM8250 mainline contributors |
++| Ideas for ABL handling (U-Boot chainload, merged-FDT notes) | provasish/hakios-spartan (read for facts only; no code copied) |
+-- 
+2.56.0
+
+
+From cae53d2a60c454d4bc61b8f17e99a970c9512349 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 01:41:01 +0530
+Subject: [PATCH 3/3] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
+ cmd-mode driver; enable display pipeline and PON reboot modes in the bitra
+ DTS
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../boot/dts/qcom/sm8250-realme-bitra.dts     |  21 +-
+ drivers/gpu/drm/panel/Kconfig                 |  10 +
+ drivers/gpu/drm/panel/Makefile                |   1 +
+ .../gpu/drm/panel/panel-samsung-ams662zs01.c  | 384 ++++++++++++++++++
+ 4 files changed, 412 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/gpu/drm/panel/panel-samsung-ams662zs01.c
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 09eff2c73..0b42bfb0a 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -44,13 +44,10 @@ &framebuffer {
+ 	stride = <(1080 * 4)>;
+ };
+ 
+-/* Stage 1: never touch storage, display pipeline, GPU, PCIe or remoteprocs */
++/* Never touch storage, GPU, DP, PCIe or remoteprocs until verified; the display pipeline is enabled for the panel bring-up */
+ &ufs_mem_hc { status = "disabled"; };
+ &ufs_mem_phy { status = "disabled"; };
+-&mdss { status = "disabled"; };
+ &mdss_dp { status = "disabled"; };
+-&mdss_dsi0 { status = "disabled"; };
+-&mdss_dsi0_phy { status = "disabled"; };
+ &gpu { status = "disabled"; };
+ &gmu { status = "disabled"; };
+ &pcie0 { status = "disabled"; };
+@@ -76,3 +73,19 @@ &usb_1_qmpphy {
+ &ramoops {
+ 	reg = <0x0 0xb0000000 0x0 0x3ff000>;
+ };
++
++/* Samsung AMS662ZS01 DSC command-mode panel; wiring from the stock tree (supplies differ from the OnePlus 8T) */
++&display_panel {
++	compatible = "samsung,ams662zs01";
++	vdd-supply = <&vreg_l13a_ts_3p0>;	/* VCI 3.0 V (pm8150_l13) */
++	vddr-supply = <&vreg_l2c_1p2>;		/* vendor "vout" rail (pm8150 C ldo2, 1.2 V) */
++	width-mm = <70>;
++	height-mm = <153>;
++	status = "okay";
++};
++
++/* reboot reasons through the PMIC PON, so `reboot bootloader` lands in ABL fastboot */
++&pon {
++	mode-bootloader = <0x2>;
++	mode-recovery = <0x1>;
++};
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index 908d69d7f..ea6970eb9 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -852,6 +852,16 @@ config DRM_PANEL_SAMSUNG_AMB655X
+ 	  Say Y or M here if you want to enable support for the
+ 	  Samsung AMB655X FHD Plus (2400x1080@120Hz) CMD mode panel.
+ 
++config DRM_PANEL_SAMSUNG_AMS662ZS01
++	tristate "Samsung AMS662ZS01 panel"
++	depends on OF
++	depends on DRM_MIPI_DSI
++	depends on BACKLIGHT_CLASS_DEVICE
++	help
++	  Say Y or M here if you want to enable support for the
++	  Samsung AMS662ZS01 FHD Plus (2400x1080@120Hz) DSC CMD mode panel
++	  found in the realme GT Neo 2.
++
+ config DRM_PANEL_SAMSUNG_AMS581VF01
+ 	tristate "Samsung AMS581VF01 panel"
+ 	depends on OF
+diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+index 18bec26af..67bc41d21 100644
+--- a/drivers/gpu/drm/panel/Makefile
++++ b/drivers/gpu/drm/panel/Makefile
+@@ -82,6 +82,7 @@ obj-$(CONFIG_DRM_PANEL_RENESAS_R61307) += panel-renesas-r61307.o
+ obj-$(CONFIG_DRM_PANEL_RENESAS_R69328) += panel-renesas-r69328.o
+ obj-$(CONFIG_DRM_PANEL_RONBO_RB070D30) += panel-ronbo-rb070d30.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_AMB655X) += panel-samsung-amb655x.o
++obj-$(CONFIG_DRM_PANEL_SAMSUNG_AMS662ZS01) += panel-samsung-ams662zs01.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_AMS678UW01) += panel-samsung-ams678uw01.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_AMS581VF01) += panel-samsung-ams581vf01.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_AMS639RQ08) += panel-samsung-ams639rq08.o
+diff --git a/drivers/gpu/drm/panel/panel-samsung-ams662zs01.c b/drivers/gpu/drm/panel/panel-samsung-ams662zs01.c
+new file mode 100644
+index 000000000..317110a16
+--- /dev/null
++++ b/drivers/gpu/drm/panel/panel-samsung-ams662zs01.c
+@@ -0,0 +1,384 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// Samsung AMS662ZS01 1080x2400 DSC command-mode OLED panel (realme GT Neo 2, bitra).
++// Init sequence and timings taken from the vendor device tree (qcom,mdss_dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt);
++// structure derived from panel-samsung-amb655x.c (the sibling OnePlus 8T panel).
++
++#include <linux/backlight.h>
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/mod_devicetable.h>
++#include <linux/module.h>
++#include <linux/regulator/consumer.h>
++
++#include <video/mipi_display.h>
++
++#include <drm/display/drm_dsc.h>
++#include <drm/display/drm_dsc_helper.h>
++#include <drm/drm_mipi_dsi.h>
++#include <drm/drm_modes.h>
++#include <drm/drm_panel.h>
++#include <drm/drm_probe_helper.h>
++#include <drm/drm_crtc.h>
++
++struct ams662zs01 {
++	struct drm_panel panel;
++	struct mipi_dsi_device *dsi;
++	struct drm_dsc_config dsc;
++	struct regulator_bulk_data *supplies;
++	struct gpio_desc *reset_gpio;
++	struct gpio_desc *vout_gpio;
++	bool hz120;
++};
++
++static const struct regulator_bulk_data ams662zs01_supplies[] = {
++	{ .supply = "vdd" },	/* VCI, 3.0 V */
++	{ .supply = "vddio" },	/* 1.8 V */
++	{ .supply = "vddr" },	/* 1.2 V logic rail named vout in the vendor tree */
++};
++
++static inline struct ams662zs01 *to_ams662zs01(struct drm_panel *panel)
++{
++	return container_of_const(panel, struct ams662zs01, panel);
++}
++
++static void ams662zs01_reset(struct ams662zs01 *ctx)
++{
++	/* vendor reset sequence: 1 (10 ms), 0 (10 ms), 1 (10 ms); the DT gpio is active-low (asserted = in reset) */
++	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
++	usleep_range(10000, 11000);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	usleep_range(10000, 11000);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
++	usleep_range(10000, 11000);
++}
++
++static int ams662zs01_on(struct ams662zs01 *ctx, bool hz120)
++{
++	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi };
++
++	mipi_dsi_dcs_exit_sleep_mode_multi(&dsi_ctx);
++	mipi_dsi_msleep(&dsi_ctx, 128);
++
++	/* DSC parameter set via DCS 0x9e (as the vendor does), then enable compression */
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9e,
++				     0x11, 0x00, 0x00, 0x89, 0x30, 0x80, 0x09,
++				     0x60, 0x04, 0x38, 0x00, 0x1e, 0x02, 0x1c,
++				     0x02, 0x1c, 0x02, 0x00, 0x02, 0x0e, 0x00,
++				     0x20, 0x02, 0xe3, 0x00, 0x07, 0x00, 0x0c,
++				     0x03, 0x50, 0x03, 0x64, 0x18, 0x00, 0x10,
++				     0xf0, 0x03, 0x0c, 0x20, 0x00, 0x06, 0x0b,
++				     0x0b, 0x33, 0x0e, 0x1c, 0x2a, 0x38, 0x46,
++				     0x54, 0x62, 0x69, 0x70, 0x77, 0x79, 0x7b,
++				     0x7d, 0x7e, 0x01, 0x02, 0x01, 0x00, 0x09,
++				     0x40, 0x09, 0xbe, 0x19, 0xfc, 0x19, 0xfa,
++				     0x19, 0xf8, 0x1a, 0x38, 0x1a, 0x78, 0x1a,
++				     0xb6, 0x2a, 0xf6, 0x2b, 0x34, 0x2b, 0x74,
++				     0x3b, 0x74, 0x6b, 0xf4, 0x00, 0x00, 0x00,
++				     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++				     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++				     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++				     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++				     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++				     0x00, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xc2, 0x14);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x9d, 0x01);
++
++	/* TE on (vblank) */
++	mipi_dsi_dcs_set_tear_on_multi(&dsi_ctx, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
++	mipi_dsi_dcs_set_column_address_multi(&dsi_ctx, 0, 1080 - 1);
++	mipi_dsi_dcs_set_page_address_multi(&dsi_ctx, 0, 2400 - 1);
++
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf0, 0x5a, 0x5a);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xb0, 0x27, 0xf2);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf2, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf0, 0xa5, 0xa5);
++
++	/* refresh rate: 0x60 0x08 = 120 Hz, 0x60 0x00 = 60 Hz */
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf0, 0x5a, 0x5a);
++	if (hz120)
++		mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x60, 0x08, 0x00);
++	else
++		mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x60, 0x00, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf7, 0x0f);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf0, 0xa5, 0xa5);
++
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_WRITE_CONTROL_DISPLAY, 0x20);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_WRITE_POWER_SAVE, 0x00);
++
++	return dsi_ctx.accum_err;
++}
++
++static int ams662zs01_enable(struct drm_panel *panel)
++{
++	struct ams662zs01 *ctx = to_ams662zs01(panel);
++	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi };
++
++	mipi_dsi_dcs_set_display_on_multi(&dsi_ctx);
++
++	return dsi_ctx.accum_err;
++}
++
++static int ams662zs01_off(struct ams662zs01 *ctx)
++{
++	struct mipi_dsi_multi_context dsi_ctx = { .dsi = ctx->dsi };
++
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf0, 0x5a, 0x5a);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x91, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, MIPI_DCS_WRITE_CONTROL_DISPLAY, 0x20);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xf0, 0xa5, 0xa5);
++	mipi_dsi_dcs_set_display_off_multi(&dsi_ctx);
++	mipi_dsi_msleep(&dsi_ctx, 11);
++	mipi_dsi_dcs_enter_sleep_mode_multi(&dsi_ctx);
++	mipi_dsi_msleep(&dsi_ctx, 128);
++
++	return dsi_ctx.accum_err;
++}
++
++static int ams662zs01_prepare(struct drm_panel *panel)
++{
++	struct ams662zs01 *ctx = to_ams662zs01(panel);
++	struct device *dev = &ctx->dsi->dev;
++	struct drm_dsc_picture_parameter_set pps;
++	int ret;
++
++	ret = regulator_bulk_enable(ARRAY_SIZE(ams662zs01_supplies), ctx->supplies);
++	if (ret < 0) {
++		dev_err(dev, "Failed to enable regulators: %d\n", ret);
++		return ret;
++	}
++
++	ams662zs01_reset(ctx);
++
++	ret = ams662zs01_on(ctx, ctx->hz120);
++	if (ret < 0) {
++		dev_err(dev, "Failed to initialize panel: %d\n", ret);
++		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++		regulator_bulk_disable(ARRAY_SIZE(ams662zs01_supplies), ctx->supplies);
++		return ret;
++	}
++
++	drm_dsc_pps_payload_pack(&pps, &ctx->dsc);
++
++	ret = mipi_dsi_picture_parameter_set(ctx->dsi, &pps);
++	if (ret < 0) {
++		dev_err(panel->dev, "failed to transmit PPS: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int ams662zs01_unprepare(struct drm_panel *panel)
++{
++	struct ams662zs01 *ctx = to_ams662zs01(panel);
++	struct device *dev = &ctx->dsi->dev;
++	int ret;
++
++	ret = ams662zs01_off(ctx);
++	if (ret < 0)
++		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
++
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	regulator_bulk_disable(ARRAY_SIZE(ams662zs01_supplies), ctx->supplies);
++
++	return 0;
++}
++
++#define AMS662ZS01_MODE(_hz, _hfp)							\
++{										\
++	.clock = (1080 + (_hfp) + 10 + 40) * (2400 + 21 + 2 + 9) * (_hz) / 1000,	\
++	.hdisplay = 1080,							\
++	.hsync_start = 1080 + (_hfp),						\
++	.hsync_end = 1080 + (_hfp) + 10,					\
++	.htotal = 1080 + (_hfp) + 10 + 40,					\
++	.vdisplay = 2400,							\
++	.vsync_start = 2400 + 21,						\
++	.vsync_end = 2400 + 21 + 2,						\
++	.vtotal = 2400 + 21 + 2 + 9,						\
++	.width_mm = 70,								\
++	.height_mm = 153,							\
++	.type = DRM_MODE_TYPE_DRIVER,						\
++}
++
++static const struct drm_display_mode ams662zs01_120_mode = AMS662ZS01_MODE(120, 50);
++static const struct drm_display_mode ams662zs01_60_mode = AMS662ZS01_MODE(60, 540);
++
++static int ams662zs01_get_modes(struct drm_panel *panel,
++			     struct drm_connector *connector)
++{
++	int count = 0;
++
++	/* 120 Hz first (preferred); the mode switch itself is a one-register write, see ams662zs01_on() */
++	count += drm_connector_helper_get_modes_fixed(connector, &ams662zs01_120_mode);
++	count += drm_connector_helper_get_modes_fixed(connector, &ams662zs01_60_mode);
++
++	return count;
++}
++
++static const struct drm_panel_funcs ams662zs01_panel_funcs = {
++	.prepare = ams662zs01_prepare,
++	.enable = ams662zs01_enable,
++	.unprepare = ams662zs01_unprepare,
++	.get_modes = ams662zs01_get_modes,
++};
++
++static int ams662zs01_bl_update_status(struct backlight_device *bl)
++{
++	struct mipi_dsi_device *dsi = bl_get_data(bl);
++	u16 brightness = backlight_get_brightness(bl);
++	int ret;
++
++	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
++
++	ret = mipi_dsi_dcs_set_display_brightness_large(dsi, brightness);
++	if (ret < 0)
++		return ret;
++
++	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
++
++	return 0;
++}
++
++static int ams662zs01_bl_get_brightness(struct backlight_device *bl)
++{
++	struct mipi_dsi_device *dsi = bl_get_data(bl);
++	u16 brightness;
++	int ret;
++
++	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
++
++	ret = mipi_dsi_dcs_get_display_brightness_large(dsi, &brightness);
++	if (ret < 0)
++		return ret;
++
++	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
++
++	return brightness;
++}
++
++static const struct backlight_ops ams662zs01_bl_ops = {
++	.update_status = ams662zs01_bl_update_status,
++	.get_brightness = ams662zs01_bl_get_brightness,
++};
++
++static struct backlight_device *
++ams662zs01_create_backlight(struct mipi_dsi_device *dsi)
++{
++	struct device *dev = &dsi->dev;
++	const struct backlight_properties props = {
++		.type = BACKLIGHT_RAW,
++		.brightness = 1174,
++		.max_brightness = 2047,
++	};
++
++	return devm_backlight_device_register(dev, dev_name(dev), dev, dsi,
++					      &ams662zs01_bl_ops, &props);
++}
++
++static int ams662zs01_probe(struct mipi_dsi_device *dsi)
++{
++	struct device *dev = &dsi->dev;
++	struct ams662zs01 *ctx;
++	int ret;
++
++	ctx = devm_drm_panel_alloc(dev, struct ams662zs01, panel,
++				   &ams662zs01_panel_funcs,
++				   DRM_MODE_CONNECTOR_DSI);
++	if (IS_ERR(ctx))
++		return PTR_ERR(ctx);
++
++	ret = devm_regulator_bulk_get_const(dev,
++					    ARRAY_SIZE(ams662zs01_supplies),
++					    ams662zs01_supplies,
++					    &ctx->supplies);
++	if (ret < 0)
++		return ret;
++
++	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(ctx->reset_gpio))
++		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
++				     "Failed to get reset-gpios\n");
++
++	/* panel AVDD enable (vendor: qcom,platform-panel-vout-gpio); optional, pinctrl may already drive it */
++	ctx->vout_gpio = devm_gpiod_get_optional(dev, "vout", GPIOD_OUT_HIGH);
++	if (IS_ERR(ctx->vout_gpio))
++		return dev_err_probe(dev, PTR_ERR(ctx->vout_gpio), "Failed to get vout-gpios\n");
++
++	ctx->hz120 = true;
++	ctx->dsi = dsi;
++	mipi_dsi_set_drvdata(dsi, ctx);
++
++	dsi->lanes = 4;
++	dsi->format = MIPI_DSI_FMT_RGB888;
++	dsi->mode_flags = MIPI_DSI_MODE_VIDEO_BURST |
++			  MIPI_DSI_MODE_NO_EOT_PACKET |
++			  MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_LPM;
++
++	ctx->panel.prepare_prev_first = true;
++
++	ctx->panel.backlight = ams662zs01_create_backlight(dsi);
++	if (IS_ERR(ctx->panel.backlight))
++		return dev_err_probe(dev, PTR_ERR(ctx->panel.backlight),
++				     "Failed to create backlight\n");
++
++	drm_panel_add(&ctx->panel);
++
++	/* This panel only supports DSC; unconditionally enable it */
++	dsi->dsc = &ctx->dsc;
++
++	ctx->dsc.dsc_version_major = 1;
++	ctx->dsc.dsc_version_minor = 1;
++
++	/* TODO: Pass slice_per_pkt = 2 */
++	ctx->dsc.slice_height = 30;
++	ctx->dsc.slice_width = 540;
++	/*
++	 * TODO: hdisplay should be read from the selected mode once
++	 * it is passed back to drm_panel (in prepare?)
++	 */
++	WARN_ON(1080 % ctx->dsc.slice_width);
++	ctx->dsc.slice_count = 1080 / ctx->dsc.slice_width;
++	ctx->dsc.bits_per_component = 8;
++	ctx->dsc.bits_per_pixel = 8 << 4; /* 4 fractional bits */
++	ctx->dsc.block_pred_enable = true;
++
++	ret = mipi_dsi_attach(dsi);
++	if (ret < 0) {
++		drm_panel_remove(&ctx->panel);
++		return dev_err_probe(dev, ret, "Failed to attach to DSI host\n");
++	}
++
++	return 0;
++}
++
++static void ams662zs01_remove(struct mipi_dsi_device *dsi)
++{
++	struct ams662zs01 *ctx = mipi_dsi_get_drvdata(dsi);
++	int ret;
++
++	ret = mipi_dsi_detach(dsi);
++	if (ret < 0)
++		dev_err(&dsi->dev, "Failed to detach from DSI host: %d\n", ret);
++
++	drm_panel_remove(&ctx->panel);
++}
++
++static const struct of_device_id ams662zs01_of_match[] = {
++	{ .compatible = "samsung,ams662zs01" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, ams662zs01_of_match);
++
++static struct mipi_dsi_driver ams662zs01_driver = {
++	.probe = ams662zs01_probe,
++	.remove = ams662zs01_remove,
++	.driver = {
++		.name = "panel-ams662zs01",
++		.of_match_table = ams662zs01_of_match,
++	},
++};
++module_mipi_dsi_driver(ams662zs01_driver);
++
++MODULE_AUTHOR("bitra mainline port (AI-assisted); based on work by Robert Oscilowski <drgitx@gmail.com>");
++MODULE_DESCRIPTION("DRM driver for Samsung AMS662ZS01 FHD cmd mode DSC DSI panel (realme GT Neo 2)");
++MODULE_LICENSE("GPL");
+-- 
+2.56.0
+
