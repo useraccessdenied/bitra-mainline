@@ -1,0 +1,9 @@
+/*
+!/.gitignore
+!/README.md
+!/ATTRIBUTION.md
+!/AI_DISCLOSURE.md
+!/docs/
+!/scripts/
+!/patches/
+__pycache__/
