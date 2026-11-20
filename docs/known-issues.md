@@ -35,3 +35,10 @@ Logged 2026-11-21. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (s
 - Display (earlier list): DSI PHY PLL warnings, fbcon text rendering, panel suspend/resume, ESD/TE over long runs.
 - Wi-Fi: convert `persist/bdwlan.elf` + regdb.bin to an ath11k board-2.bin entry; real MAC; BT real address; BT LE scan test/pairing/A2DP.
 - Audio, modem (external SDX55M), sensors, camera: see docs/20.
+
+## Found by the debug-kernel soak (docs/23) — upstream-side display bugs, not fixed
+- `msm_gem.c:170` `GEM_WARN_ON(msm_obj->pin_count)` on every fbdev teardown (panel unbind): the fbdev GEM object is freed while pinned.
+- `dpu_encoder_helper_wait_for_irq: encoder is disabled ... ctl_start_irq` on every panel off/on (blank): command-mode kickoff vs disable race.
+- Under fault injection: `refcount_t underflow` in `drm_dev_put()` from `drm_self_refresh_helper_entry_work` and a KASAN null-ptr-deref in `msm_drm_uninit -> dsi_unbind -> msm_dsi_tx_buf_free -> update_lru_locked` (dev_private already NULL after a failed `msm_drm_init`). Needs the fail-nth sweep to attribute.
+- **Phone unreachable after `soak.sh failnth 1 6`** (see docs/23): needs a manual power cycle; cause unknown.
+- Fixed in our tree (upstream candidates): typec altmode descriptor not zeroed (UBSAN), DPU self-refresh helper leak (512 B x 2 per DRM bring-up), qcom-wdt not marking an armed watchdog as running.

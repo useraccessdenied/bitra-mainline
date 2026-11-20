@@ -8,6 +8,7 @@
 #   soak.sh mix SECS              all of the above in parallel plus CPU load for SECS seconds
 #   soak.sh rebind [N]            N times: unbind + bind the panel driver (teardown/probe paths)
 #   soak.sh fault [N] [PCT]       N probes of the panel driver with PCT% of this task's slab allocations failing
+#   soak.sh failnth FROM TO       deterministic sweep: fail exactly the Nth slab allocation of the panel probe, N=FROM..TO; reports N values that produced a splat
 #   soak.sh leak                  kmemleak scan + print
 #   soak.sh report [boot|soak]    count/print sanitizer, lockdep, WARN, BUG findings
 P=/sys/bus/mipi-dsi/drivers/panel-ams662zs01
@@ -53,6 +54,25 @@ case "$1" in
     loop step_fault ${2:-40}
     echo 0 > $FS/probability; echo N > $FS/task-filter
     [ -e $P/$D ] || echo $D > $P/bind; mark "fault done" ;;
+  failnth)
+    A=${2:-1}; Z=${3:-100}; mark "failnth $A..$Z"
+    echo N > $FS/ignore-gfp-wait; echo 100 > $FS/probability; echo 1 > $FS/interval; echo 100000 > $FS/times; echo 0 > $FS/space
+    PATF='KASAN|Unable to handle|refcount_t|BUG:|possible circular|inconsistent lock|UBSAN|use-after-free|Oops'
+    n=$A
+    while [ $n -le $Z ]; do
+      base=$(dmesg | grep -c -E "$PATF")
+      echo $D > $P/unbind 2>/dev/null; sleep 1
+      left=$( ( echo $n > /proc/self/fail-nth; echo $D > $P/bind 2>/dev/null; cat /proc/self/fail-nth ) 2>/dev/null )
+      sleep 1
+      [ -e $P/$D ] || { echo $D > $P/bind 2>/dev/null; bound=failed; }
+      sleep 2
+      new=$(dmesg | grep -c -E "$PATF")
+      st=${bound:-ok}; bound=
+      if [ "$new" -gt "$base" ]; then echo "N=$n injected(left=$left) probe=$st SPLAT(+$((new-base)))"; else echo "N=$n injected(left=$left) probe=$st clean"; fi
+      [ "$left" = "0" ] || { echo "N=$n was past the last allocation point (left=$left): sweep complete"; break; }
+      n=$((n+1))
+    done
+    echo 0 > $FS/probability; mark "failnth done" ;;
   leak)
     mark "kmemleak scan"; echo scan > /sys/kernel/debug/kmemleak; sleep 6; echo scan > /sys/kernel/debug/kmemleak
     cat /sys/kernel/debug/kmemleak | head -60 ;;

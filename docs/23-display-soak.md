@@ -33,5 +33,23 @@ Totals over the session: KASAN 0, lockdep 0, hung task/soft lockup 0, Oops 0.
 5. Panel driver itself: no sanitizer/lockdep findings, no leak in 40 injected-failure probes. Earlier hardening (PPS-failure power-down, connector pointer cleared on remove) is exercised by the rebind/fault phases.
 6. Known/benign: DSI PHY PLL WARNs at boot (see known-issues).
 
-## Verification of the fixes
-See the section below (second debug kernel run).
+
+## Long run (first debug kernel)
+`bitra-drm anim 0 600 1 v`: 72,351 vblanks in 600 s = **120.5 Hz, no drift**; no DPU errors, no sanitizer/lockdep/hung-task findings; a further 120 s animation held ~115 fps on the heavy debug kernel.
+
+## Second debug kernel (7.2.0-g50c10c1c4741 = bitra + the 3 fixes) — verification
+- **Type-C UBSAN**: gone from the boot log (UBSAN: 0). Fixed by commit ee1805433.
+- **Self-refresh leak**: after the same 10 panel rebinds, kmemleak shows **0** `drm_self_refresh_helper_init` objects (was 2 per rebind); only the 2 benign `build_sched_domains` objects remain. Fixed by fba17282e.
+- **Watchdog**: userspace was reached at ~25-30 s uptime on the debug kernel and the phone stayed up (qcom-wdt patch 50c10c1c4).
+- **msm_gem.c:170 WARN** (19 in 10 rebinds) unchanged — not fixed, see finding 3.
+- Second fault-injection run (40 probes @25% failslab): all 40 probes failed as injected and unwound, 0 leaks from the panel driver, 0 self-refresh leaks, **but this time the run also produced**
+  - `refcount_t: underflow; use-after-free` in `drm_dev_put()` from `__drm_atomic_commit_free()` called by **`drm_self_refresh_helper_entry_work`** while a failed display bring-up was being unwound;
+  - `KASAN: null-ptr-deref` in `update_lru_locked` <- `put_pages` <- `msm_gem_free_object` <- `msm_gem_kernel_put` <- `msm_dsi_tx_buf_free` <- `dsi_unbind` <- `component_unbind_all` <- `msm_drm_uninit` <- `msm_drm_unbind` <- ... <- `ams662zs01_remove` (unbind).
+    `update_lru_locked()` dereferences `obj->dev->dev_private`; it is NULL, i.e. the DSI tx-buffer GEM object belongs to a DRM device whose `msm_drm_init()` error path already ran `ddev->dev_private = NULL; drm_dev_put(ddev)` (msm_drv.c) while the DSI component still owned the buffer.
+  Both are in upstream msm/DRM error-unwinding (not in the panel driver). The first run (random 25%) did not hit them, the second did: different injection points. They need the deterministic sweep below to attribute precisely (is the refcount imbalance caused by the new drmm self-refresh cleanup, or pre-existing? the splat shows the *worker* doing the put, and the imbalance exists before my cleanup runs, but this is NOT proven).
+
+## Deterministic sweep (`soak.sh failnth FROM TO`) and an unresolved hang
+`/proc/self/fail-nth` fails exactly the Nth slab allocation of the task that writes `bind`, so N = 1, 2, ... walks every allocation point of the panel probe + DRM bring-up.
+The first attempt (`failnth 1 6`) never returned: the agent command timed out after 120 s and **the phone then stayed unreachable for 20+ minutes** (agent state `absent`; the Mac showed a fresh USB network interface with a DHCP lease from the phone, but nothing answered on 192.168.2.15:23, so the phone was alive in some early boot stage).
+Not diagnosed: it may be (a) a real kernel hang/deadlock in the unbind/bind path at a small N (small N also hits the shell's own VFS/sysfs allocations), (b) a hard hang followed by a watchdog reset into the *flashed* Droidian that then stuck in its initrd, or (c) something unrelated. Needs a physical power cycle (hold Power ~15 s) before any further tests.
+Lessons for the harness: run the sweep from a start N above the shell/VFS allocations, in small chunks, with each chunk's result written to a file the next call can `get`; consider a tiny helper binary that does the fail-nth write + bind itself, so the injected failures only hit the driver path; and make sure a hung phone can reach fastboot without a key combo (it cannot today: `to-fastboot` needs the shell).
