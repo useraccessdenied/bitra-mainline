@@ -59,3 +59,16 @@ rows must be 4352 bytes apart). Backlight sysfs brightness works. Known noise: W
 (`DSI PLL(0) lock failed`, `dsi0_phy_pll_out_dsiclk already disabled`) during `of_clk_add_hw_provider` reparenting — harmless so far, to be cleaned up.
 Not yet checked: 60 Hz mode switch, ESD/TE behaviour, fbcon text rendering (`sys_imageblit: framebuffer is not in virtual address space`
 warning from fbcon on msmdrmfb), suspend/resume of the panel.
+
+## Refresh rates measured (t-d4, tools/bitra-drm.c)
+`bitra-drm modes | anim MODE SECS [ROWS] [v]` — raw-syscall DRM tool baked into the initramfs (/bin/bitra-drm): lists modes, sets one,
+page-flips an animation and reports the real rate from flip-complete events (`v` = pure WAIT_VBLANK rate).
+- First attempt: 120 Hz mode ran at only ~72 fps and the vblank rate was ~120 Hz in BOTH modes. Two causes: (1) the driver always sent the
+  panel its 120 Hz command (`60 08 00`), so the panel's TE stayed at 120 Hz even in the 60 Hz mode; (2) in DSC command mode msm derives the
+  DSI clock from the mode's pixel clock (pclk x compressed-htotal/htotal x 24/32 lanes) = ~805 Mbit/s/lane at 120 Hz → ~6.4 ms per frame of an
+  8.33 ms period, so ~40% of frames missed a TE tick.
+- Fix: panel selects 0x60 data from the committed adjusted_mode (connector remembered in get_modes); the 120 Hz mode carries 1216 extra
+  vertical porch lines (clock 344→516 MHz, ~1.2 Gbit/s/lane, same trick as the OnePlus 8T driver).
+- Result: 120 Hz mode 120.5 fps (vblank 120.5), 60 Hz mode 60.3 fps (vblank 60.3); 8 rapid 120<->60 switches clean, no new kernel errors.
+- Initramfs holds /dev/watchdog0 open: the per-pet "watchdog did not stop!" messages are gone. `to-fastboot` works from a mainline session
+  (PMIC PON reboot-mode + tools/bitra-reboot.c), so the dev loop needs no key presses.

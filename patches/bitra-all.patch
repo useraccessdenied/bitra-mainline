@@ -1,7 +1,7 @@
 From 9a616e34e143e69a5855c9926f1ca180ff4353d7 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 00:52:56 +0530
-Subject: [PATCH 1/3] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
+Subject: [PATCH 1/4] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
  shim, permanent efifb console
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
@@ -339,7 +339,7 @@ index 3d060d599..7bc261d7b 100644
 From 4f0778d7b3004ac95f9b16313eba79f7f61b1dde Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:23:37 +0530
-Subject: [PATCH 2/3] Add AI_DISCLOSURE.md and ATTRIBUTION.md
+Subject: [PATCH 2/4] Add AI_DISCLOSURE.md and ATTRIBUTION.md
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 ---
@@ -390,7 +390,7 @@ index 000000000..0b55ca1b4
 From cae53d2a60c454d4bc61b8f17e99a970c9512349 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:41:01 +0530
-Subject: [PATCH 3/3] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
+Subject: [PATCH 3/4] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
  cmd-mode driver; enable display pipeline and PON reboot modes in the bitra
  DTS
 
@@ -865,6 +865,96 @@ index 000000000..317110a16
 +MODULE_AUTHOR("bitra mainline port (AI-assisted); based on work by Robert Oscilowski <drgitx@gmail.com>");
 +MODULE_DESCRIPTION("DRM driver for Samsung AMS662ZS01 FHD cmd mode DSC DSI panel (realme GT Neo 2)");
 +MODULE_LICENSE("GPL");
+-- 
+2.56.0
+
+
+From 7d3ecada4e400091bdf07248f4283b98e3795397 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 02:05:20 +0530
+Subject: [PATCH 4/4] ams662zs01: select panel refresh from the active mode;
+ extra blanking on the 120 Hz mode to raise the DSI link rate
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../gpu/drm/panel/panel-samsung-ams662zs01.c  | 33 +++++++++++++++----
+ 1 file changed, 26 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/gpu/drm/panel/panel-samsung-ams662zs01.c b/drivers/gpu/drm/panel/panel-samsung-ams662zs01.c
+index 317110a16..c275bf445 100644
+--- a/drivers/gpu/drm/panel/panel-samsung-ams662zs01.c
++++ b/drivers/gpu/drm/panel/panel-samsung-ams662zs01.c
+@@ -22,6 +22,7 @@
+ 
+ struct ams662zs01 {
+ 	struct drm_panel panel;
++	struct drm_connector *connector;
+ 	struct mipi_dsi_device *dsi;
+ 	struct drm_dsc_config dsc;
+ 	struct regulator_bulk_data *supplies;
+@@ -149,6 +150,12 @@ static int ams662zs01_prepare(struct drm_panel *panel)
+ 
+ 	ams662zs01_reset(ctx);
+ 
++	if (ctx->connector && ctx->connector->state && ctx->connector->state->crtc &&
++	    ctx->connector->state->crtc->state)
++		ctx->hz120 = drm_mode_vrefresh(&ctx->connector->state->crtc->state->adjusted_mode) > 90;
++	else
++		ctx->hz120 = true;
++
+ 	ret = ams662zs01_on(ctx, ctx->hz120);
+ 	if (ret < 0) {
+ 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
+@@ -184,30 +191,42 @@ static int ams662zs01_unprepare(struct drm_panel *panel)
+ 	return 0;
+ }
+ 
+-#define AMS662ZS01_MODE(_hz, _hfp)							\
++/*
++ * In command mode the DSI clock is derived from the mode's pixel clock, not from a real blanking period.
++ * The vendor tree runs the link at 800-830 MHz; that leaves ~1.3 ms of slack per 120 Hz frame, so the 120 Hz
++ * mode carries 1216 extra "porch" lines (like the OnePlus 8T panel) to raise the link to ~1.2 Gbit/s per lane.
++ */
++#define AMS662ZS01_MODE(_hz, _hfp, _vfp)						\
+ {										\
+-	.clock = (1080 + (_hfp) + 10 + 40) * (2400 + 21 + 2 + 9) * (_hz) / 1000,	\
++	.clock = (1080 + (_hfp) + 10 + 40) * (2400 + (_vfp) + 2 + 9) * (_hz) / 1000,	\
+ 	.hdisplay = 1080,							\
+ 	.hsync_start = 1080 + (_hfp),						\
+ 	.hsync_end = 1080 + (_hfp) + 10,					\
+ 	.htotal = 1080 + (_hfp) + 10 + 40,					\
+ 	.vdisplay = 2400,							\
+-	.vsync_start = 2400 + 21,						\
+-	.vsync_end = 2400 + 21 + 2,						\
+-	.vtotal = 2400 + 21 + 2 + 9,						\
++	.vsync_start = 2400 + (_vfp),						\
++	.vsync_end = 2400 + (_vfp) + 2,						\
++	.vtotal = 2400 + (_vfp) + 2 + 9,					\
+ 	.width_mm = 70,								\
+ 	.height_mm = 153,							\
+ 	.type = DRM_MODE_TYPE_DRIVER,						\
+ }
+ 
+-static const struct drm_display_mode ams662zs01_120_mode = AMS662ZS01_MODE(120, 50);
+-static const struct drm_display_mode ams662zs01_60_mode = AMS662ZS01_MODE(60, 540);
++static const struct drm_display_mode ams662zs01_120_mode = AMS662ZS01_MODE(120, 50, 21 + 1216);
++static const struct drm_display_mode ams662zs01_60_mode = AMS662ZS01_MODE(60, 540, 21);
++
++static inline struct ams662zs01 *ctx_from_panel(struct drm_panel *panel)
++{
++	return container_of_const(panel, struct ams662zs01, panel);
++}
+ 
+ static int ams662zs01_get_modes(struct drm_panel *panel,
+ 			     struct drm_connector *connector)
+ {
+ 	int count = 0;
+ 
++	ctx_from_panel(panel)->connector = connector;
++
+ 	/* 120 Hz first (preferred); the mode switch itself is a one-register write, see ams662zs01_on() */
+ 	count += drm_connector_helper_get_modes_fixed(connector, &ams662zs01_120_mode);
+ 	count += drm_connector_helper_get_modes_fixed(connector, &ams662zs01_60_mode);
 -- 
 2.56.0
 

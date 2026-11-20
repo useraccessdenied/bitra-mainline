@@ -24,13 +24,10 @@ b.INIT = b.INIT.replace(
 # pet the ABL-armed watchdog from the first instruction of init; report USB bring-up state
 b.INIT = b.INIT.replace('log() { echo "bitra-debug: $*" > /dev/kmsg; echo "bitra-debug: $*"; }',
     'log() { echo "<2>bitra-debug: $*" > /dev/kmsg; }')
-# keep /dev/watchdog0 open (a close-per-pet logs 'watchdog did not stop!' on the console every 4 s)
-b.INIT = b.INIT.replace('( while :; do echo . > /dev/watchdog0 2>/dev/null || echo . > /dev/watchdog 2>/dev/null; sleep 4; done ) &',
-    '( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &')
 b.INIT = b.INIT.replace('/bin/busybox --install -s /bin 2>/dev/null',
     '/bin/busybox --install -s /bin 2>/dev/null\n'
     'mount -t devtmpfs devtmpfs /dev 2>/dev/null\n'
-    '( while :; do echo . > /dev/watchdog0 2>/dev/null || echo . > /dev/watchdog 2>/dev/null; sleep 4; done ) &', 1)
+    '( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &  # fd held open: no per-pet close warning\n', 1)
 b.INIT = b.INIT.replace('UDC=$(ls /sys/class/udc | head -n1)',
     'mount -t debugfs none /sys/kernel/debug 2>/dev/null\n'
     'log "wdt: $(ls /dev/watchdog* 2>&1 | tr "\\n" " ")"\n'
@@ -67,12 +64,22 @@ case "$*" in
 esac
 exit 0
 '''
+LINUX = Path(os.environ.get("MAINLINE_SRC", BITRA / "roms/mainline/linux"))
+OUT = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out"))
+def build_drm_tool():
+    out = Path(tempfile.mkdtemp()) / "bitra-drm"
+    subprocess.run([str(CLANG), "--target=aarch64-linux-gnu", "-static", "-nostdlib", "-ffreestanding", "-fno-stack-protector",
+                    "-O2", "-fuse-ld=lld", "-D__linux__", "-D__user=", "-Wno-#warnings",
+                    f"-I{LINUX}/include/uapi", f"-I{LINUX}/arch/arm64/include/uapi", f"-I{OUT}/arch/arm64/include/generated/uapi",
+                    "-o", str(out), str(ROOT / "tools/bitra-drm.c")], check=True)
+    return out.read_bytes()
 _helper = build_reboot_helper()
+_drm = build_drm_tool()
 _orig_cpio = b.cpio_newc
 def _cpio(entries):
     import stat as _st
     X = _st.S_IFREG | 0o755
-    return _orig_cpio(entries + [("bin/bitra-reboot", X, _helper, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+    return _orig_cpio(entries + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
 b.cpio_newc = _cpio
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]
