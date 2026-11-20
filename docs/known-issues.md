@@ -29,3 +29,9 @@ Logged 2026-11-21. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (s
 - Works (docs/22). Open: suspend/resume + double-tap wake untested; no wake while the screen is off but the system is not suspended (same as upstream review note); axis orientation vs the panel not yet verified in a UI; no pressure value in this report layout.
 - The unmerged `synaptics_tcm_i2c` driver (and my hardening commit) should go back to the author / linux-input; the old `synaptics_s3908` stays disabled in our config (same compatible).
 - ABL-agnostic tool note: tools/bitra-evtest.c had a pollfd layout bug (fixed).
+
+## Deferred by the owner (2026-11-21) — do later
+- Touchscreen: **suspend/resume and double-tap wake** (untested; upstream reviewer reports wake from suspend working on an 8T), and **orientation/axes vs the panel in a real UI**.
+- Display (earlier list): DSI PHY PLL warnings, fbcon text rendering, panel suspend/resume, ESD/TE over long runs.
+- Wi-Fi: convert `persist/bdwlan.elf` + regdb.bin to an ath11k board-2.bin entry; real MAC; BT real address; BT LE scan test/pairing/A2DP.
+- Audio, modem (external SDX55M), sensors, camera: see docs/20.
