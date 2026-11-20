@@ -41,6 +41,12 @@ b.INIT = b.INIT.replace('  telnetd -b 0.0.0.0:23 -l /bin/sh',
     "  printf 'start 192.168.2.20\\nend 192.168.2.30\\ninterface %s\\nlease_file /tmp/udhcpd.leases\\noption subnet 255.255.255.0\\n' \"$IF\" > /tmp/udhcpd.conf\n"
     '  udhcpd /tmp/udhcpd.conf &\n'
     '  telnetd -b 0.0.0.0:23 -l /bin/sh',1)
+# the agent's shell wrapper does `exec bash ... || exec sh`; a failed exec kills busybox ash, so give it a bash,
+# and its file transfer uses /usr/local/sbin/busybox-bitra nc
+b.INIT = b.INIT.replace('mount -t devtmpfs devtmpfs /dev 2>/dev/null\n',
+    'mount -t devtmpfs devtmpfs /dev 2>/dev/null\n'
+    "printf '#!/bin/busybox sh\\nexec /bin/busybox ash\\n' > /bin/bash; chmod +x /bin/bash\n"
+    'mkdir -p /usr/local/sbin; ln -sf /bin/busybox /usr/local/sbin/busybox-bitra\n', 1)
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]
 extra = "clk_ignore_unused pd_ignore_unused panic=0 consoleblank=0 earlycon=efifb keep_bootcon fw_devlink.sync_state=strict loglevel=4"
