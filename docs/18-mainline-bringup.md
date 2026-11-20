@@ -104,3 +104,14 @@ Kernel config snapshot: configs/bitra_defconfig (savedefconfig of the working bu
 - Classic inquiry works (`hcitool scan` found the owner's other phone). LE scanning is NOT verified: `hcitool lescan` fails ("Set scan parameters failed: I/O error", BT5 controllers want the
   extended-scan commands) and raw extended scan via `hcitool cmd` + `hcidump` returned no reports (inconclusive). `btmgmt` needs a tty; a proper test wants bluetoothd/bluetoothctl.
 - Tools: Alpine `bluez-deprecated` (hciconfig/hcitool/hcidump are static) needs `libudev.so.1` (eudev-libs); `btmgmt` needs readline+ncurses (pushed by hand, not in the image).
+
+## RESULT: UFS works on mainline — read-only probe verified against the backup (2026-11-21, t-u1)
+Enabled `ufs_mem_hc` + `ufs_mem_phy` (supplies verified against the stock tree: vcc = pm8150_l17 3.0 V, vccq = pm8150_l6 1.2 V, vccq2 = pm8150_s4 1.8 V; built in: SCSI_UFSHCD_PLATFORM,
+SCSI_UFS_QCOM, BLK_DEV_SD, PHY_QCOM_QMP_UFS). RAM boot only, nothing mounted, every sd* set read-only with `blockdev --setro`.
+- Device: SAMSUNG KLUEG8UHDB-C2D1 (UFS 3.1, 256 GB), 6 LUNs sda..sdf; `ufshcd-qcom`: "freq-table-hz property not specified" and "Unable to find vdd-hba-supply regulator, assuming enabled" (harmless notices).
+- GPT: LUNs sdb..sdf match the backup (info/gpt-sd?.bin) byte for byte; sda's partition table is identical (11 entries, same GUIDs/ranges); the first-MiB hash differs only in 28 blocks
+  starting at `persist` (a live ext4 partition written by Android) — expected drift.
+- Read integrity: sha256 of 15 firmware partitions (abl, aop, devcfg, hyp, keymaster, xbl, xbl_config, imagefv, multiimgoem, qupfw, dsp 64 MiB, modem 195 MiB, bluetooth, cmnlib64, featenabler)
+  read through mainline UFS match the backup hashes: 15/15.
+- Caveat: ufshcd performs a few standard device query writes during init (e.g. attributes/flags such as bActiveICCLevel, fDeviceInit); these are not verified/undone — nothing indicates a problem.
+- Next: read-only mount of `persist` (sda2, ext4, `-o ro,noload`) to read the real Wi-Fi MAC and Bluetooth address instead of the placeholders.
