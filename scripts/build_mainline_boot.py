@@ -129,6 +129,12 @@ def build_evtest_tool():
                     f"-I{LINUX}/include/uapi", f"-I{LINUX}/arch/arm64/include/uapi", f"-I{OUT}/arch/arm64/include/generated/uapi",
                     "-o", str(out), str(ROOT / "tools/bitra-evtest.c")], check=True)
     return out.read_bytes()
+def build_failnth_tool():
+    out = Path(tempfile.mkdtemp()) / "bitra-failnth"
+    subprocess.run([str(CLANG), "--target=aarch64-linux-gnu", "-static", "-nostdlib", "-ffreestanding", "-fno-stack-protector",
+                    "-O2", "-fuse-ld=lld", "-o", str(out), str(ROOT / "tools/bitra-failnth.c")], check=True)
+    return out.read_bytes()
+_failnth = build_failnth_tool()
 _helper = build_reboot_helper()
 _drm = build_drm_tool()
 _evtest = build_evtest_tool()
@@ -136,7 +142,7 @@ _orig_cpio = b.cpio_newc
 def _cpio(entries):
     import stat as _st
     X = _st.S_IFREG | 0o755
-    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/soak.sh", X, (ROOT / "tools/soak.sh").read_bytes(), None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/bitra-failnth", X, _failnth, None), ("bin/soak.sh", X, (ROOT / "tools/soak.sh").read_bytes(), None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
 b.cpio_newc = _cpio
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]

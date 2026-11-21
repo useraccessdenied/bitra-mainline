@@ -53,3 +53,24 @@ Totals over the session: KASAN 0, lockdep 0, hung task/soft lockup 0, Oops 0.
 The first attempt (`failnth 1 6`) never returned: the agent command timed out after 120 s and **the phone then stayed unreachable for 20+ minutes** (agent state `absent`; the Mac showed a fresh USB network interface with a DHCP lease from the phone, but nothing answered on 192.168.2.15:23, so the phone was alive in some early boot stage).
 Not diagnosed: it may be (a) a real kernel hang/deadlock in the unbind/bind path at a small N (small N also hits the shell's own VFS/sysfs allocations), (b) a hard hang followed by a watchdog reset into the *flashed* Droidian that then stuck in its initrd, or (c) something unrelated. Needs a physical power cycle (hold Power ~15 s) before any further tests.
 Lessons for the harness: run the sweep from a start N above the shell/VFS allocations, in small chunks, with each chunk's result written to a file the next call can `get`; consider a tiny helper binary that does the fail-nth write + bind itself, so the injected failures only hit the driver path; and make sure a hung phone can reach fastboot without a key combo (it cannot today: `to-fastboot` needs the shell).
+
+## Round 3: deterministic fail-nth (2026-11-21)
+
+**Why the first sweep hung the phone:** `soak.sh failnth` set failslab `probability=100` *without* `task-filter`, so every
+allocation on the whole system failed, not just the Nth one of the probe. Rewritten: failslab `task-filter=Y`, `probability=0`,
+and a freestanding helper `tools/bitra-failnth.c` that opens the bind file and `/proc/self/fail-nth` first, arms N, does ONE
+`write()` to `bind`, and prints `ret=… left=…` (`left=0` = the Nth allocation really failed). Only that write's allocations can fail.
+
+**First real result (N=33, debug kernel t-dbg2):** a generic pinctrl bug, nothing to do with msm/DPU or the panel driver:
+`parse_fw_cfg()` (drivers/pinctrl/pinconf-generic.c) passes an unchecked `bitmap_zalloc()` to `test_and_set_bit()` ->
+`KASAN: null-ptr-deref in parse_fw_cfg` via `pinctrl_bind_pins()` during really_probe, followed by a NULL oops and a slab
+use-after-free in the same task, and the shell/`reboot` then hung on the held device lock (the phone had to be force-restarted).
+Fix committed in the kernel fork (6e291167c, upstream candidate, 3 lines). N=30..32 were clean (the injected failure was
+handled, `probe=ok`).
+
+**Consequence for the earlier msm findings:** the refcount-underflow / `msm_drm_uninit` NULL deref seen under 25% random fault
+injection are still unattributed; a sweep after the pinctrl fix (t-dbg3) is needed, because any splat after N=33 on t-dbg2 was
+polluted by the oops.
+
+**Status:** t-dbg3 (pinctrl fix, `bitra-failnth` in the initramfs) built; after a force-restart through fastboot the phone did
+not come back on RAM boot (no USB interface for 7+ minutes), sweep not yet run. Needs a power cycle.
