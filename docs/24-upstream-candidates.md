@@ -21,6 +21,8 @@ Status values: `local` (only in the fork), `sent` (link), `merged`.
 | 10 | (not written) | drm/msm | `msm_disp_snapshot` devcoredump holds duplicated atomic state (fb/gem/drm_dev refs) for 5 min: pins the drm_device (DRM minors exhausted after ~64 fast rebinds, bind fails -ENOSPC) and its late free oopses in `msm_gem_free_object` (dev_private NULL) | fail-nth N=47, soak | **open, no fix yet** |
 | 11 | (not written) | drm/msm | `msm_gem.c:170 GEM_WARN_ON` in `update_lru_locked` on every panel unbind (fb object freed while still pinned) | KASAN soak | **open** |
 | 12 | (not written) | drm/msm/dpu | "encoder is disabled" DPU error logged on every panel blank/unblank (kickoff vs disable race) | soak | **open** |
+| 13 | 4527ced2e | drm/msm | `msm_irq_install()` frees the irq when `msm_irq_postinstall()` fails but leaves `kms->irq_requested` set; `msm_irq_uninstall()` never clears it either -> second `free_irq()` ("Trying to free already-free IRQ" WARN) | fail-nth N=750..800 (t-dbg7) | local, verified N=770..790 on t-dbg10 |
+| 14 | 593dc5215 | drm/msm/dpu | `dpu_kms_destroy()` leaves `rpm_enabled` set after `pm_runtime_disable()`; a later bind failing before `dpu_kms_init()` disables runtime PM again -> "Unbalanced pm_runtime_enable!" on the next good bind (and a lockdep splat via the printk) | fail-nth N=778 (t-dbg8) | local, verified N=770..790 on t-dbg10 |
 
 Notes for sending:
 - #1, #3, #5 are tiny and independent: send first (typec, watchdog, pinctrl lists).

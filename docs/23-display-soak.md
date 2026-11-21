@@ -116,3 +116,10 @@ t-dbg6 over the end region (N=700..760) and the stride range once more, and a cl
   last points exposed two more stale-worker bugs of the same class: N=733,735,737 `slab-use-after-free in kthread_destroy_worker`
   from `msm_atomic_destroy_pending_timer` (via `dpu_kms_destroy`), and N=739 null-ptr-deref in `msm_disp_snapshot_destroy`
   (`msm_disp_snapshot_init` stored an ERR_PTR in `kms->dump_worker`). Fixed in 'clear the pending-timer and snapshot workers' (t-dbg7).
+
+## Round 5 (t-dbg7 -> t-dbg10, 2026-11-21): two more lifetime bugs, same class
+fail-nth N=746..819 on t-dbg7 (all `left=0`: the probe makes more than 830 allocations in one bind, end not reached yet).
+- N=750.. : 109x `WARNING kernel/irq/manage.c:1880 free_irq` from `msm_drm_kms_uninit` <- `msm_drm_init`. Cause: stale `kms->irq_requested` (upstream-candidate #13, 4527ced2e).
+- N=778 (t-dbg8): "Unbalanced pm_runtime_enable!" + lockdep "circular locking dependency" (console_owner vs dev->power.lock; only because the warning is printed under power.lock with a geni console). Cause: stale `dpu_kms->rpm_enabled` (#14, 593dc5215).
+- Also seen, unrelated to the sweep: boot-time clk_core_disable/unprepare WARNs (kworker, ~19 s), rpmh.c:386 WARN from sugov (cpufreq), msm_gem.c:170 (#11, known).
+- t-dbg10 (all fixes): N=770..790 21/21 clean, none of the above in dmesg.
