@@ -107,3 +107,12 @@ Recovery notes: after a KASAN oops in a driver unbind the shell can still answer
 Coverage: N=1..400 every allocation, N=401..752 every 9th, then the sweep reached the end of the probe (left>0 at 752 on
 t-dbg5). Result tables of the raw sweeps are kept in the scratchpad only; the table above is the summary. Still to do: sweep
 t-dbg6 over the end region (N=700..760) and the stride range once more, and a clean N=1..400 on t-dbg6.
+
+## Round 4 (t-dbg6: pinctrl + self-refresh + kms worker/global-state + kms->wq fixes)
+
+- N=1..400 every allocation: **zero splats, 400/400**; every injected failure either did not matter (`probe=ok`) or failed the
+  probe with -ENOMEM and unwound cleanly with an immediate clean rebind.
+- End region N=700..739 (the probe has ~738 slab allocations): the `kms->wq` fix holds (no `touch_wq_lockdep_map` oops), but the
+  last points exposed two more stale-worker bugs of the same class: N=733,735,737 `slab-use-after-free in kthread_destroy_worker`
+  from `msm_atomic_destroy_pending_timer` (via `dpu_kms_destroy`), and N=739 null-ptr-deref in `msm_disp_snapshot_destroy`
+  (`msm_disp_snapshot_init` stored an ERR_PTR in `kms->dump_worker`). Fixed in 'clear the pending-timer and snapshot workers' (t-dbg7).
