@@ -85,6 +85,7 @@ Findings, each reproduced deterministically and fixed in the kernel fork (all up
 | 33 | KASAN null-ptr-deref `parse_fw_cfg` (pinctrl core), then oops + UAF + hung unbind | unchecked `bitmap_zalloc()` | 6e291167c pinctrl: check the allocation |
 | 5, 22 | `refcount_t: addition on 0` / underflow in `drm_self_refresh_helper_entry_work` -> `drm_dev_put` | the delayed work takes a drm_dev ref when it runs; cancelling it from my drmm action (fba17282e) is too late, the device is already being released. The work is pre-existing upstream, my action did not create the race (without it the work would also outlive the device, and leak) | cancel/free the helper data in `msm_drm_kms_uninit()` while the device is still referenced |
 | 99+ (after a failed init) | KASAN slab-use-after-free in `kthread_destroy_worker` | `struct msm_kms` outlives the DRM device across unbind/bind; `msm_drm_kms_uninit` destroyed `event_thread[].worker` without clearing it, so a later failed bring-up destroyed the stale workers again | clear the pointers |
+| 752 (the last allocation point; the probe makes ~750 slab allocations) | KASAN null-ptr-deref in `touch_wq_lockdep_map` via `msm_drm_kms_uninit` -> `flush_workqueue(kms->wq)` | same lifetime class: `msm_kms_destroy()` freed `kms->wq` without clearing it; a failed next bring-up (before/inside `msm_kms_init`) flushes a stale/NULL queue. The oops killed the helper while it held the device lock, so unbind/reboot then hung (power cycle needed) | clear the pointer, guard the flush (t-dbg6, built and committed, not yet swept) |
 | 99+ | KASAN double-free in `dpu_kms_global_destroy_state` | `dpu_kms_destroy()` finalises the global private object even if `hw_init` failed before initialising it / it was already finalised | guard + zero after fini |
 
 After these (t-dbg5): N=1..400 = zero splats except N=47, which is the devcoredump issue below. The failed-probe range unwinds
@@ -102,3 +103,7 @@ is torn down; not done.
 Recovery notes: after a KASAN oops in a driver unbind the shell can still answer; `to-fastboot` works but may take a minute.
 `echo b > /proc/sysrq-trigger` over the agent timed out and left ABL in a state where the next RAM boot never enumerated
 (needed a power cycle) - use `to-fastboot`.
+
+Coverage: N=1..400 every allocation, N=401..752 every 9th, then the sweep reached the end of the probe (left>0 at 752 on
+t-dbg5). Result tables of the raw sweeps are kept in the scratchpad only; the table above is the summary. Still to do: sweep
+t-dbg6 over the end region (N=700..760) and the stride range once more, and a clean N=1..400 on t-dbg6.
