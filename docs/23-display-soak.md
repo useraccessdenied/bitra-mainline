@@ -72,5 +72,33 @@ handled, `probe=ok`).
 injection are still unattributed; a sweep after the pinctrl fix (t-dbg3) is needed, because any splat after N=33 on t-dbg2 was
 polluted by the oops.
 
-**Status:** t-dbg3 (pinctrl fix, `bitra-failnth` in the initramfs) built; after a force-restart through fastboot the phone did
-not come back on RAM boot (no USB interface for 7+ minutes), sweep not yet run. Needs a power cycle.
+## Round 3 results (kernels t-dbg3..t-dbg5, 2026-11-21)
+
+Sweep: `soak.sh failnth FROM TO OUTFILE [STEP]` (fail exactly the Nth slab allocation of one `write()` to the panel driver's
+`bind`, then rebind if the probe failed, grep dmesg for KASAN/UBSAN/refcount/BUG/lockdep). The probe makes well over 400
+allocations (N up to 400 still hit one with `left=0`), so the sweep continues with a stride.
+
+Findings, each reproduced deterministically and fixed in the kernel fork (all upstream candidates):
+
+| N (t-dbg3/4) | splat | cause | fix |
+|---|---|---|---|
+| 33 | KASAN null-ptr-deref `parse_fw_cfg` (pinctrl core), then oops + UAF + hung unbind | unchecked `bitmap_zalloc()` | 6e291167c pinctrl: check the allocation |
+| 5, 22 | `refcount_t: addition on 0` / underflow in `drm_self_refresh_helper_entry_work` -> `drm_dev_put` | the delayed work takes a drm_dev ref when it runs; cancelling it from my drmm action (fba17282e) is too late, the device is already being released. The work is pre-existing upstream, my action did not create the race (without it the work would also outlive the device, and leak) | cancel/free the helper data in `msm_drm_kms_uninit()` while the device is still referenced |
+| 99+ (after a failed init) | KASAN slab-use-after-free in `kthread_destroy_worker` | `struct msm_kms` outlives the DRM device across unbind/bind; `msm_drm_kms_uninit` destroyed `event_thread[].worker` without clearing it, so a later failed bring-up destroyed the stale workers again | clear the pointers |
+| 99+ | KASAN double-free in `dpu_kms_global_destroy_state` | `dpu_kms_destroy()` finalises the global private object even if `hw_init` failed before initialising it / it was already finalised | guard + zero after fini |
+
+After these (t-dbg5): N=1..400 = zero splats except N=47, which is the devcoredump issue below. The failed-probe range unwinds
+cleanly (`probe=failed` on injected -ENOMEM, immediately rebindable).
+
+**Open, upstream-side: display error snapshots pin the DRM device.** `msm_disp_snapshot_*` stores a duplicated atomic state
+(`disp_state->atomic_state`, holds framebuffer/gem + drm_dev references) in a devcoredump that lives for 5 minutes. (a) With
+fast unbind/bind cycles each snapshot keeps its drm_device alive: after ~64 bring-ups drm_minor_alloc returns ENOSPC and every
+bind fails with -28 (this made the first t-dbg4/5 sweeps meaningless from N~110 on; the harness now purges
+`/sys/class/devcoredump/devcd*/data` every iteration). (b) If the coredump is freed after teardown, `msm_disp_state_free` ->
+`drm_atomic_commit_put` -> `msm_gem_free_object` dereferences `dev_private` (NULL after `msm_drm_uninit`): oops in
+`devcd_del` (N=47). Possible fix: snapshot should format its atomic state to text or drop the references when the DRM device
+is torn down; not done.
+
+Recovery notes: after a KASAN oops in a driver unbind the shell can still answer; `to-fastboot` works but may take a minute.
+`echo b > /proc/sysrq-trigger` over the agent timed out and left ABL in a state where the next RAM boot never enumerated
+(needed a power cycle) - use `to-fastboot`.

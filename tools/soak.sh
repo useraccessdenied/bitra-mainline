@@ -8,7 +8,7 @@
 #   soak.sh mix SECS              all of the above in parallel plus CPU load for SECS seconds
 #   soak.sh rebind [N]            N times: unbind + bind the panel driver (teardown/probe paths)
 #   soak.sh fault [N] [PCT]       N probes of the panel driver with PCT% of this task's slab allocations failing
-#   soak.sh failnth FROM TO [OUTFILE]   deterministic sweep: fail exactly the Nth slab allocation of a write to the panel bind file (helper bitra-failnth); reports splats per N
+#   soak.sh failnth FROM TO [OUTFILE [STEP]]   deterministic sweep: fail exactly the Nth slab allocation of a write to the panel bind file (helper bitra-failnth); reports splats per N
 #   soak.sh leak                  kmemleak scan + print
 #   soak.sh report [boot|soak]    count/print sanitizer, lockdep, WARN, BUG findings
 P=/sys/bus/mipi-dsi/drivers/panel-ams662zs01
@@ -58,12 +58,15 @@ case "$1" in
     # Only ONE allocation of ONE write() fails: failslab is task-filtered with probability 0 (so nothing else is affected;
     # the earlier probability=100 without task-filter failed every allocation system-wide and hung the phone), and
     # bitra-failnth opens everything first, arms fail-nth=N and does a single write to the driver's bind file.
-    A=${2:-1}; Z=${3:-100}; OUTF=${4:-/tmp/failnth.txt}; mark "failnth $A..$Z"
+    A=${2:-1}; Z=${3:-100}; OUTF=${4:-/tmp/failnth.txt}; STEP=${5:-1}; mark "failnth $A..$Z"
     echo Y > $FS/task-filter; echo N > $FS/ignore-gfp-wait; echo 0 > $FS/probability; echo 1 > $FS/interval
     echo 100000 > $FS/times; echo 0 > $FS/space
     PATF='KASAN|Unable to handle|refcount_t|BUG:|possible circular|inconsistent lock|UBSAN|use-after-free|Oops'
     n=$A
     while [ $n -le $Z ]; do
+      # a DPU error snapshot (devcoredump) pins the drm_device for 5 min; with fast rebinds that exhausts the 64 DRM minors
+      # (ENOSPC from drm_minor_alloc) and its late free oopses (docs/known-issues): drop them every iteration
+      for f in /sys/class/devcoredump/devcd*/data; do [ -e "$f" ] && echo 1 > "$f"; done 2>/dev/null
       base=$(dmesg | grep -c -E "$PATF")
       echo $D > $P/unbind 2>/dev/null; sleep 1
       res=$(bitra-failnth $P/bind $D $n 2>&1)
@@ -74,7 +77,7 @@ case "$1" in
       if [ "$new" -gt "$base" ]; then r="SPLAT(+$((new-base)))"; else r=clean; fi
       echo "N=$n $res probe=$st $r" | tee -a $OUTF
       case "$res" in *"left=0"*) ;; *) echo "N=$n past the last allocation point: sweep complete" | tee -a $OUTF; break;; esac
-      n=$((n+1))
+      n=$((n+STEP))
     done
     echo 0 > $FS/probability; echo N > $FS/task-filter; mark "failnth done" ;;
   leak)
