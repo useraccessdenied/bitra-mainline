@@ -47,3 +47,8 @@ After a hang during the standby-power experiments reset the phone into the Droid
 4. `reboot` (no fastboot): the phone booted Alpine on its own (`androidboot.mode=normal`, root `sda11`).
 Recovery if a flashed image ever fails to boot: enter fastboot with the keys (the screen stays on the bootloader), `fastboot flash boot boot-droidian-backup.img` or flash any other known-good boot image; `fastboot boot IMG` also works from the keys-entered fastboot.
 Development flow now: build a test image, RAM-boot it (`ssh mac to-fastboot` from Alpine, `ramboot`), and flash it with `flash-boot.sh` only when it is good. The modules in the rootfs must match the kernel release (`7.2.0-bitra`).
+
+### Update 2026-11-22 (later): `mainline-boot-2.img` flashed
+Same kernel (`7.2.0-bitra`) and cmdline as `mainline-boot-1`, plus an initramfs change: right after mounting the root, `/pstore` is copied to `/var/lib/pstore/early-<uptime>/` (the previous boot's ramoops console/dmesg survive even if the next boot dies before userspace).
+sha256 `8ecc47d16a773eb0980e7a16586071674d0674cc382413877da0071a459ae643`, flashed with `tools/flash-boot.sh` after confirming the partition held `mainline-boot-1` (hash `22dc32fb...`); readback OK; normal reboot came up in Alpine on its own and the early copy ran.
+Rollback images: `releases/mainline-boot-1.img` (previous), `bitra/backups/boot-before-mainline-20261122/` (Droidian).
