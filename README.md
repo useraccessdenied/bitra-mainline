@@ -11,11 +11,11 @@ Companion repos
 
 ## Status (2026-11-22)
 Mainline **7.2.0 boots the phone into Alpine Linux 3.24 from UFS (`userdata`)**: console on the panel (fbcon), touchscreen, Wi-Fi, USB-NCM + SSH shells,
-battery gauge, thermal sensing, input devices for the hardware keys. It boots standalone from the flashed `boot` partition (kernel + initramfs);
+battery gauge, thermal sensing, input devices for the hardware keys, and a **Sway graphical session with a working, accelerated Adreno 650 GPU** (docs/29). It boots standalone from the flashed `boot` partition (kernel + initramfs);
 the mainline boot image is **flashed to `boot`** (2026-11-22), so the phone boots Alpine by itself; test kernels are still RAM-booted with `fastboot boot`.
 
 Per-hardware status (working / partial / not working / untested) is tracked in **[docs/27-hardware-status.md](docs/27-hardware-status.md)** — keep it current.
-Biggest gaps: audio, cellular modem, camera, sensors and the GPU (all need the remote processors / firmware work), charging control (fast charge), suspend, standalone boot.
+Biggest gaps: audio, cellular modem, camera and sensors (all need the remote processors / firmware work), charging control (fast charge), suspend, standalone boot.
 
 ## Repository layout
 | Path | What |

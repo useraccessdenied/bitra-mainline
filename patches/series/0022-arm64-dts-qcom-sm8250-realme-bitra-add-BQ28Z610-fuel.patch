@@ -1,7 +1,7 @@
 From dac11722c7ac2e585ecd667e36f93aef9a5be9a1 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 12:42:42 +0530
-Subject: [PATCH 22/24] arm64: dts: qcom: sm8250-realme-bitra: add BQ28Z610
+Subject: [PATCH 22/25] arm64: dts: qcom: sm8250-realme-bitra: add BQ28Z610
  fuel gauge, drop kasan_multi_shot from bootargs
 
 The gauge sits on i2c16 (0x888000) like on the OnePlus 8T; read-only

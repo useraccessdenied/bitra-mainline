@@ -24,7 +24,11 @@ FW_ROOT = Path(os.environ.get("FIRMWARE_DIR", "/usr/lib/firmware"))
 FW_FILES = ["regulatory.db", "regulatory.db.p7s", "ath11k/QCA6390/hw2.0/amss.bin", "ath11k/QCA6390/hw2.0/m3.bin",
             "ath11k/QCA6390/hw2.0/board-2.bin", "qca/htbtfw20.tlv", "qca/htnv20.bin"]
 PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", "e2fsprogs", "e2fsprogs-extra", "bluez", "dbus",
-            "wireless-regdb", "nano", "htop", "util-linux", "kbd", "curl", "i2c-tools", "evtest", "python3"]
+            "wireless-regdb", "nano", "htop", "util-linux", "kbd", "curl", "i2c-tools", "evtest", "python3",
+            # graphical session (docs/29): sway + Mesa (freedreno/turnip) + seat/udev stack
+            "sway", "seatd", "foot", "grim", "wlr-randr", "swaybg", "mesa-dri-gallium", "mesa-egl", "mesa-gles", "mesa-gbm",
+            "mesa-vulkan-freedreno", "vulkan-tools", "libinput-tools", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
+            "font-dejavu", "weston-clients", "mesa-demos", "wev", "linux-firmware-qcom"]
 TOOLS = [("bitra-reboot", False), ("bitra-failnth", False), ("bitra-drm", True), ("bitra-evtest", True)]
 
 
@@ -316,13 +320,28 @@ def inner(a):
     def chroot(*cmd, inp=None):
         return subprocess.run(["chroot", str(root), *cmd], check=True, input=inp)
 
-    for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("mdev", "sysinit"), ("hwdrivers", "sysinit"),
+    for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("seatd", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
                      ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-wifi", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
     chroot("/usr/sbin/chpasswd", inp=b"root:bitra\n")
+    # graphical session user (dev password), groups for seatd/DRM/input
+    chroot("/usr/sbin/addgroup", "-S", "render")
+    chroot("/usr/sbin/adduser", "-D", "-s", "/bin/sh", "bitra")
+    chroot("/usr/sbin/chpasswd", inp=b"bitra:bitra\n")
+    for g in ("video", "input", "render", "seat", "audio"):
+        chroot("/usr/sbin/addgroup", "bitra", g)
+    for rel in ("home/bitra/.config/sway/config", "usr/local/bin/bitra-sway-start"):
+        src = ROOT / "rootfs-overlay" / rel
+        put(rel, src.read_bytes(), 0o755 if rel.startswith("usr/") else 0o644)
+    chroot("/bin/chown", "-R", "1000:1000", "/home/bitra")   # bitra is the first user (uid/gid 1000)
+    # GPU: the device-specific signed ZAP shader (split MDT) from the stock vendor firmware; sqe/gmu come from linux-firmware-qcom
+    zap = BITRA / "firmware/stock-a13/v-extract/vendor/firmware"
+    for n in ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02"):
+        if (zap / n).exists():
+            put("lib/firmware/qcom/sm8250/realme/bitra/" + n, (zap / n).read_bytes())
 
     img = Path(a.out)
     img.parent.mkdir(parents=True, exist_ok=True)
@@ -341,7 +360,7 @@ def inner(a):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--branch", default="v3.24")
-    ap.add_argument("--size-mb", type=int, default=2048)
+    ap.add_argument("--size-mb", type=int, default=1280)
     ap.add_argument("--out", default=str(ROOT / "releases/alpine-rootfs.ext4"))
     a = ap.parse_args()
     if os.geteuid() != 0:

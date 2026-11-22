@@ -1,0 +1,22 @@
+# minimal sway config for the bitra phone (bring-up test)
+set $term foot
+font pango:DejaVu Sans Mono 11
+default_border pixel 3
+output * scale 2
+output * bg #1b2a3a solid_color
+# the touchscreen drives the panel
+input type:touch {
+    map_to_output DSI-1
+}
+# hardware keys: volume up = terminal, volume down = screenshot (also a way to run things without a keyboard)
+bindsym XF86AudioRaiseVolume exec $term
+bindsym XF86AudioLowerVolume exec sh -c 'grim -t png /tmp/shot-$(date +%H%M%S).png'
+bindsym Mod4+Return exec $term
+bindsym Mod4+Shift+q kill
+focus_follows_mouse no
+bar {
+    position top
+    status_command while :; do date +'%a %H:%M:%S'; sleep 1; done
+    font pango:DejaVu Sans Mono 11
+}
+exec $term

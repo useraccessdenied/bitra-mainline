@@ -7,4 +7,5 @@
 !/scripts/
 !/patches/
 !/tools/
+!/rootfs-overlay/
 __pycache__/

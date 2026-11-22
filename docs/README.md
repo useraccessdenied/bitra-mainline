@@ -4,6 +4,7 @@ Numbering continues the `bitra` workspace docs (00–17 cover LineageOS and Droi
 
 | Doc | What it is |
 |---|---|
+| [29-graphics-gpu.md](29-graphics-gpu.md) | Sway on the panel (touch, keys, 120 Hz) and Adreno 650 acceleration (freedreno/turnip), firmware pitfalls |
 | [28-suspend-resume.md](28-suspend-resume.md) | s2idle suspend/resume: staged test, wake sources verified, gaps |
 | [27-hardware-status.md](27-hardware-status.md) | **Hardware status tracker**: working / partial / not working / untested per block, with evidence and next steps. Keep it current. |
 | [known-issues.md](known-issues.md) | Detailed open items, deferred owner items, parked fault-injection sweep state |

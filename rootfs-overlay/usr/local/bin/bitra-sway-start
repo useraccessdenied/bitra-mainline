@@ -1,0 +1,5 @@
+#!/bin/sh
+# start sway for user bitra on the current VT (seatd handles DRM/input access). WLR_RENDERER=pixman (software) or gles2 (GPU/llvmpipe).
+R=/run/user/1000
+mkdir -p $R && chown bitra:bitra $R && chmod 700 $R
+exec su -l bitra -c "XDG_RUNTIME_DIR=$R LIBSEAT_BACKEND=seatd WLR_RENDERER=${WLR_RENDERER:-pixman} sway > /tmp/sway.log 2>&1"
