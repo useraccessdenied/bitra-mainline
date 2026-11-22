@@ -1,7 +1,7 @@
 From cae53d2a60c454d4bc61b8f17e99a970c9512349 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 01:41:01 +0530
-Subject: [PATCH 03/22] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
+Subject: [PATCH 03/23] panel: add Samsung AMS662ZS01 (realme GT Neo 2) DSC
  cmd-mode driver; enable display pipeline and PON reboot modes in the bitra
  DTS
 

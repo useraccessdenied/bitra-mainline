@@ -20,3 +20,4 @@
 0020-drm-msm-clear-irq_requested-after-free_irq-to-avoid-.patch
 0021-drm-msm-dpu-clear-rpm_enabled-after-pm_runtime_disab.patch
 0022-arm64-dts-qcom-sm8250-realme-bitra-add-BQ28Z610-fuel.patch
+0023-Add-BITRA.md-what-this-fork-is-and-where-the-docs-li.patch
