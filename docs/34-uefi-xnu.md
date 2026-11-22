@@ -26,6 +26,14 @@ Project-Silicium/Mu-Silicium has `Platforms/Realme/bitraPkg` (SM8250-AC, status 
 Minor errors in that log, not fatal: `CPU Vectors region not present in cfg file` (ArmCpuDxe), `Rpmh Sleep callback registration failed (0x...03)`, `PlatformUpdateSmBiosType17: Failed to get DDR Speeds`.
 The `abl` read failure itself was not diagnosed (probably the UFS driver does not expose LUN 4 to PIL, or the ABL image check); it is skipped, not solved.
 
+## HakiOS loader.efi runs on bitra (2026-11-23)
+`loader.efi` built from the HakiOS tree (`arch/arm64/boot/build.sh`, clang + lld-link, 76 KB, placeholder identity), embedded in the UEFI firmware volume (`FILE APPLICATION` GUID
+7A6E1A52-0C5D-4E3B-9B1F-4C1D2A0B7E01 in `bitraPkg/Include/RAW.inc`) and registered as a Boot Manager entry "HackiOS" in `PlatformBootOptions.c`. With `PcdFrameBufferDelay` back at 10 ms the boot is fast again.
+Owner photo of the screen: the HackiOS banner (the text says "POCO X5 Pro", hard-coded) and
+`XNULOADER v3 | UEFI recovery`, `CurrentEL=1 MIDR=51df805e CNTFRQ=19200000 image=a1000000`, `display 1080 x 2400 at 9c000000`, `platform qemu-virt` (no bitra board package, so it falls back),
+`no payload at f0000000 (magic 0)`, `usb: start failed 800000000000000e` (EFI_NOT_FOUND: no UEFI USB-gadget protocol, as expected), `USB recovery unavailable; holding in loader`.
+So: UEFI -> boot manager -> HakiOS loader -> framebuffer text works; what is missing is a payload (kernel + userland) and a bitra board package.
+
 ## What it means for XNU
 - **Framebuffer boot of the UEFI: reached.** The HakiOS loader could draw on the same framebuffer (0x9C000000, 1080x2400x32).
 - **USB NCM shell: not possible in this stack.** Mu-Silicium lists USB device mode as not working on bitra (there is no USB device after the UEFI starts), and HakiOS has no network gadget anyway.
