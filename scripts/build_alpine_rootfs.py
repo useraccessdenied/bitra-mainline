@@ -346,6 +346,10 @@ def inner(a):
         if src.is_file():
             rel = str(src.relative_to(overlay))
             put(rel, src.read_bytes(), 0o755 if rel.startswith(("usr/local/bin/", "etc/init.d/")) else 0o644)
+    # services shipped in the overlay exist only now, after the runlevel loop above ran
+    for svc in ("bitra-sensors",):
+        if (root / "etc/init.d" / svc).exists():
+            chroot("/sbin/rc-update", "add", svc, "default")
     chroot("/bin/chown", "-R", "1000:1000", "/home/bitra")
     # Phosh: tinydm autologin (uid 1000 = bitra) starts the phosh session; NetworkManager must not touch the USB gadget link
     put("var/lib/tinydm/default-session.desktop", "", 0o644)
