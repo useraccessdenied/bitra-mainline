@@ -17,9 +17,49 @@ import build_debug_initramfs as b
 
 ROOT = b.ROOT
 BITRA = b.BITRA
+
+# PID 1 loop: waits for a root switch request (written by /bin/bitra-switchroot or the bitra.root= kernel parameter) and
+# does the switch_root itself (it must run as PID 1).  The watchdog-petting subshell survives the switch (its sleep comes
+# from the new root's PATH); telnetd/udhcpd are killed and restarted by the new root's bitra-net service.
+SWITCHROOT_LOOP = r'''
+CMDROOT=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^bitra.root=//p')
+n=0
+while true; do
+  if [ -n "$CMDROOT" ] && [ ! -s /tmp/switchroot.req ] && [ $n -lt 90 ]; then
+    for d in /sys/class/block/sd*; do
+      grep -qx "PARTNAME=$CMDROOT" $d/uevent 2>/dev/null && echo /dev/${d##*/} > /tmp/switchroot.req
+    done
+  fi
+  if [ -s /tmp/switchroot.req ]; then
+    DEV=$(cat /tmp/switchroot.req); rm -f /tmp/switchroot.req
+    log "switch_root: mounting $DEV"
+    mkdir -p /newroot
+    if mount -t ext4 -o rw,noatime "$DEV" /newroot; then
+      # telnetd/udhcpd of the initramfs keep running (their shell is the new root's /bin/sh): a way in even if bitra-net fails
+      mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore
+      for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done
+      exec switch_root /newroot /sbin/init
+    fi
+    log "switch_root: mount of $DEV failed"; CMDROOT=
+  fi
+  n=$((n+1)); sleep 1
+done
+'''
+BITRA_SWITCHROOT = b'''#!/bin/busybox sh
+# usage: bitra-switchroot part NAME   (GPT partition label, e.g. userdata)
+#        bitra-switchroot loop FILE   (ext4 image in RAM: test without touching UFS)
+case "$1" in
+  part) for d in /sys/class/block/sd*; do grep -qx "PARTNAME=$2" $d/uevent && DEV=/dev/${d##*/}; done ;;
+  loop) for i in 0 1 2 3 4 5 6 7; do losetup /dev/loop$i "$2" 2>/dev/null && DEV=/dev/loop$i && break; done ;;
+  *) echo "usage: $0 part NAME | loop FILE"; exit 2 ;;
+esac
+[ -b "$DEV" ] || { echo "no device"; exit 1; }
+echo "$DEV" > /tmp/switchroot.req
+echo "switching to $DEV (the shell connection will drop)"
+'''
 b.INIT = b.INIT.replace(
     'while true; do log "alive $(cat /proc/uptime | cut -d\' \' -f1)s"; sleep 10; done',
-    'while true; do sleep 600; log "alive $(cat /proc/uptime | cut -d\' \' -f1)s"; done')
+    SWITCHROOT_LOOP)
 # quiet kernel log + status lines at KERN_CRIT so they show on the (very slow) panel console;
 # pet the ABL-armed watchdog from the first instruction of init; report USB bring-up state
 b.INIT = b.INIT.replace('log() { echo "bitra-debug: $*" > /dev/kmsg; echo "bitra-debug: $*"; }',
@@ -64,6 +104,7 @@ case "$*" in
 esac
 exit 0
 '''
+
 LINUX = Path(os.environ.get("MAINLINE_SRC", BITRA / "roms/mainline/linux"))
 OUT = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out"))
 def build_drm_tool():
@@ -142,7 +183,7 @@ _orig_cpio = b.cpio_newc
 def _cpio(entries):
     import stat as _st
     X = _st.S_IFREG | 0o755
-    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/bitra-failnth", X, _failnth, None), ("bin/soak.sh", X, (ROOT / "tools/soak.sh").read_bytes(), None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+    return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-switchroot", X, BITRA_SWITCHROOT, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/bitra-failnth", X, _failnth, None), ("bin/soak.sh", X, (ROOT / "tools/soak.sh").read_bytes(), None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
 b.cpio_newc = _cpio
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]
