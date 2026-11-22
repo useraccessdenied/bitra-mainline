@@ -1,0 +1,25 @@
+From da53c710f8dc063944f14c4d1af46d10124ddb1b Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 20:40:03 +0530
+Subject: [PATCH 30/30] arm64: dts: qcom: sm8250-realme-bitra: enable the SLPI
+ remoteproc
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 287c0add3..4f9009078 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -283,3 +283,9 @@ &vamacro {
+ 	pinctrl-1 = <&dmic01_sleep>, <&dmic23_sleep>, <&dmic45_sleep>;
+ 	pinctrl-names = "default", "sleep";
+ };
++
++/* Sensor DSP (SLPI): firmware extracted from the stock modem partition (tools/extract-dsp-firmware.py), memory region from the OnePlus common DT */
++&slpi {
++	firmware-name = "qcom/sm8250/realme/bitra/slpi.mdt";
++	status = "okay";
++};

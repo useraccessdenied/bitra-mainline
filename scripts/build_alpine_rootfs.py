@@ -33,7 +33,9 @@ PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", 
             "phosh", "phoc", "phosh-keyboard", "squeekboard", "elogind", "elogind-openrc", "polkit-elogind", "upower", "gnome-console",
             "gnome-session", "gnome-settings-daemon", "iio-sensor-proxy", "feedbackd", "networkmanager", "networkmanager-openrc",
             "networkmanager-wifi", "networkmanager-cli", "tinydm", "tinydm-openrc", "xwayland", "mesa-gl",
-            "alsa-utils", "alsa-utils-openrc", "alsa-ucm-conf", "pulseaudio-utils"]
+            "alsa-utils", "alsa-utils-openrc", "alsa-ucm-conf", "pulseaudio-utils",
+            # sensors (docs/32): SLPI FastRPC server + Qualcomm Sensor Core client library/CLI
+            "hexagonrpcd", "hexagonrpcd-openrc", "hexagonrpcd-udev", "libssc"]
 TOOLS = [("bitra-reboot", False), ("bitra-failnth", False), ("bitra-drm", True), ("bitra-evtest", True)]
 
 
@@ -327,7 +329,7 @@ def inner(a):
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("elogind", "default"), ("polkit", "default"), ("tinydm", "default"), ("networkmanager", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
-                     ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"),
+                     ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
@@ -354,8 +356,30 @@ def inner(a):
     zap = BITRA / "firmware/stock-a13/v-extract/vendor/firmware"
     # DSP firmware (tools/extract-dsp-firmware.py from the modem partition backup); only the ADSP is enabled in the DT so far
     dsp = ROOT / "third_party/firmware/qcom/sm8250/realme/bitra"
-    for f in sorted(dsp.glob("adsp.*")):
-        put("lib/firmware/qcom/sm8250/realme/bitra/" + f.name, f.read_bytes())
+    for pat in ("adsp.*", "slpi.*"):
+        for f in sorted(dsp.glob(pat)):
+            put("lib/firmware/qcom/sm8250/realme/bitra/" + f.name, f.read_bytes())
+    # sensor configuration served to the SLPI by hexagonrpcd (docs/32): vendor + odm JSON configs and sns_reg.conf from the stock ROM extracts
+    qroot = "usr/share/qcom/sm8250/realme/bitra"
+    stock = BITRA / "firmware/stock-a13"
+    for src, sub in ((stock / "v-extract/vendor/etc/sensors/config", "sensors/config"), (stock / "o-extract/odm/etc/sensor/config", "sensors/config")):
+        if src.is_dir():
+            for f in sorted(src.iterdir()):
+                put(f"{qroot}/{sub}/{f.name}", f.read_bytes())
+    if (stock / "v-extract/vendor/etc/sensors/sns_reg_config").exists():
+        put(f"{qroot}/sensors/sns_reg.conf", (stock / "v-extract/vendor/etc/sensors/sns_reg_config").read_bytes())
+    (root / qroot / "sensors/registry/registry").mkdir(parents=True, exist_ok=True)
+    put("etc/conf.d/hexagonrpcd-sdsp", 'hexagonrpcd_fw_dir="/' + qroot + '"\n')
+    (root / "odm/etc/sensor").mkdir(parents=True, exist_ok=True)       # the DSP opens /odm/etc/sensor/config literally
+    if not (root / "odm/etc/sensor/config").is_symlink():
+        (root / "odm/etc/sensor/config").symlink_to("/" + qroot + "/sensors/config")
+    ids = {}                                                            # numeric ids: chown by name fails inside the build chroot
+    for kind, f in (("uid", "etc/passwd"), ("gid", "etc/group")):
+        for line in (root / f).read_text().splitlines():
+            if line.startswith("fastrpc:"):
+                ids[kind] = line.split(":")[2 if kind == "uid" else 2]
+    if "uid" in ids and "gid" in ids:
+        chroot("/bin/chown", "-R", f"{ids['uid']}:{ids['gid']}", "/usr/share/qcom")
     for n in ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02"):
         if (zap / n).exists():
             put("lib/firmware/qcom/sm8250/realme/bitra/" + n, (zap / n).read_bytes())

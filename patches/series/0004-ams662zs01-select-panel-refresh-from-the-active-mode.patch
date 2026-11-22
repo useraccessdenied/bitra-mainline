@@ -1,7 +1,7 @@
 From 7d3ecada4e400091bdf07248f4283b98e3795397 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:05:20 +0530
-Subject: [PATCH 04/29] ams662zs01: select panel refresh from the active mode;
+Subject: [PATCH 04/30] ams662zs01: select panel refresh from the active mode;
  extra blanking on the 120 Hz mode to raise the DSI link rate
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

@@ -1,7 +1,7 @@
 From 4527ced2e750d2be18e4c2a7448bc26aee072f8e Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 23:06:58 +0530
-Subject: [PATCH 20/29] drm/msm: clear irq_requested after free_irq to avoid
+Subject: [PATCH 20/30] drm/msm: clear irq_requested after free_irq to avoid
  double free
 
 If msm_irq_postinstall() fails, msm_irq_install() frees the irq but leaves

@@ -1,7 +1,7 @@
 From ee1805433e00e3709c8a9999f979e9a1c27dabe0 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 04:08:34 +0530
-Subject: [PATCH 12/29] usb: typec: zero the altmode descriptor in
+Subject: [PATCH 12/30] usb: typec: zero the altmode descriptor in
  typec_port_register_altmodes()
 
 desc was left uninitialised on the stack; only svid, vdo and mode are set before it is passed to typec_port_register_altmode(), which copies desc->mode_selection (a bool) and desc->roles. UBSAN on a KASAN/UBSAN debug kernel (realme GT Neo 2, qcom pmic-typec):
