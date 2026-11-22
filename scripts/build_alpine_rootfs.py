@@ -183,6 +183,25 @@ stop() {
 }
 """
 
+BITRA_TIME = """#!/sbin/openrc-run
+description="no RTC on this phone: restore the last known time (TLS needs a sane clock), then sync with NTP when a network is up"
+depend() { need localmount; before bitra-wifi sshd; }
+start() {
+    now=$(date +%s)
+    saved=$(cat /var/lib/bitra-time 2>/dev/null || echo 0)
+    built=$(cat /etc/bitra-build-time 2>/dev/null || echo 0)
+    best=$saved; [ "$built" -gt "$best" ] && best=$built
+    [ "$now" -lt "$best" ] && date -s "@$best" >/dev/null
+    # plain background job (not start-stop-daemon): it exits when the time is synced, which openrc would report as 'crashed'
+    setsid sh -c 'until ntpd -q -n -p pool.ntp.org -p time.cloudflare.com >/dev/null 2>&1; do sleep 10; done; mkdir -p /var/lib; date +%s > /var/lib/bitra-time' >/dev/null 2>&1 &
+    return 0
+}
+stop() {
+    mkdir -p /var/lib; date +%s > /var/lib/bitra-time
+    return 0
+}
+"""
+
 FSTAB = "# <fs> <mountpoint> <type> <opts> <dump> <pass>\nLABEL=bitra-root / ext4 rw,noatime 0 1\n"
 INITTAB = """::sysinit:/sbin/openrc sysinit
 ::sysinit:/sbin/openrc boot
@@ -223,6 +242,8 @@ def inner(a):
     put("etc/init.d/bitra-net", BITRA_NET, 0o755)
     put("etc/init.d/bitra-growfs", BITRA_GROWFS, 0o755)
     put("etc/init.d/bitra-diag", BITRA_DIAG, 0o755)
+    put("etc/init.d/bitra-time", BITRA_TIME, 0o755)
+    put("etc/bitra-build-time", str(int(__import__("time").time())) + "\n")
     put("etc/init.d/bitra-wifi", BITRA_WIFI, 0o755)
     put("etc/init.d/bitra-watch", BITRA_WATCH, 0o755)
     put("etc/init.d/bitra-telnetd", BITRA_TELNETD, 0o755)
@@ -252,7 +273,7 @@ def inner(a):
         return subprocess.run(["chroot", str(root), *cmd], check=True, input=inp)
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("mdev", "sysinit"),
-                     ("hostname", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
+                     ("hostname", "boot"), ("bitra-time", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
                      ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-wifi", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():

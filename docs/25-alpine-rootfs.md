@@ -27,3 +27,10 @@ The Droidian install on `userdata` was wiped (owner's decision); the Droidian in
 - The Android boot image cuts the kernel command line (512 + 1024 bytes): put important parameters (`bitra.root=`) FIRST in `--cmdline-extra`.
 - `bitra-agent put` of a 2 GiB file failed (EINVAL); keep transfers < ~1 GiB. `stage` of 2 GiB works.
 - Debugging without a shell: the panel console works, so print diagnostics into `/etc/issue` (bitra-diag) and photograph the screen.
+
+## apk / TLS needs a clock (2026-11-22)
+The phone has no RTC (`/sys/class/rtc` is empty), so it boots at 1970-01-01 and `apk update` fails with `TLS: server certificate not trusted`
+(and curl/https the same). `bitra-time` (boot runlevel) restores max(`/var/lib/bitra-time`, `/etc/bitra-build-time`) before the network comes up,
+then loops `ntpd -q` in the background until a server answers and saves the time (also saved on shutdown). Installed live on the flashed system
+with `put` + `rc-update add bitra-time boot`; the builder bakes it into new images. A real fix is the PMIC RTC (pm8150 rtc is not enabled in our DT).
+Note: `example.com` does not resolve on the owner's LAN (router DNS); other hosts work. Not a phone issue.
