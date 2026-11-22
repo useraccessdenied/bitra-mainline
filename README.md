@@ -15,7 +15,7 @@ battery gauge, thermal sensing, input devices for the hardware keys, and a **Pho
 the mainline boot image is **flashed to `boot`** (2026-11-22), so the phone boots Alpine by itself; test kernels are still RAM-booted with `fastboot boot`.
 
 Per-hardware status (working / partial / not working / untested) is tracked in **[docs/27-hardware-status.md](docs/27-hardware-status.md)** — keep it current.
-Biggest gaps: cellular modem, camera and sensors (CDSP/SLPI firmware is extracted, not enabled), audio beyond the speakers (microphones, earpiece, UCM), charging control (fast charge), suspend, standalone boot.
+Biggest gaps: cellular modem, camera and sensors (CDSP/SLPI firmware is extracted, not enabled), audio beyond the speakers (microphones, earpiece, headset), charging control (fast charge), suspend, standalone boot.
 
 ## Repository layout
 | Path | What |

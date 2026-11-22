@@ -84,8 +84,8 @@ GPU load combined with repeated suspend/resume cycles; other GPU fault types (io
 check that the cooling device actually throttles when the thermal trips are reached (force a hot run or lower a trip), memory leaks across hours (`/proc/meminfo`, dmesg), and the `sync_state` wait on the GMU. Baseline for comparison: docs/29 'GPU tests' (5 min, peak 60 C, no throttling needed).
 
 ## Audio round (2026-11-22, docs/31)
-- One unexplained reset during the first playback attempt (PulseAudio was also probing the card); not reproduced with PulseAudio stopped. Retest with PulseAudio/PipeWire playing.
-- No UCM profile for the card: PulseAudio reports "Failed to find a working profile" and Phosh has no sound; speakers only work through manual `amixer`/`aplay` routing.
+- One unexplained reset during the first playback attempt (PulseAudio was also probing the card); not reproduced with PulseAudio stopped, nor with PulseAudio playing through the UCM sink. Keep watching.
+- UCM profile exists for the speaker only (docs/31); no microphone/earpiece/headset entries yet.
 - AFE commands right after the ADSP boot are rejected (status 0x16: LPASS vote, first clock SET_PARAM); they work minutes later. The vote reply is handled (fails fast), the first clock set is retried by deferred probing.
 - Older record in pstore (`dmesg-ramoops-0`, 971 s uptime): `fsa4480_switch_set` taking a corrupted mutex from `tcpm_snk_attach` -> `typec_set_orientation`, i.e. the USB-C stack using an FSA4480 that had been **unbound** by the standby-power bisect scripts (stale switch pointer after unbind). Not a regression of the normal configuration, but unbinding `fsa4480` while a typec switch references it is unsafe.
 - `cpu cpu7: Voltage update failed freq=3187200` / `failed to update OPP` at boot (the 3.19 GHz OPP of the SM8250-AC/870 does not get its voltage).

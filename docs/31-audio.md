@@ -1,7 +1,7 @@
 # 31 — Audio: ADSP firmware, sound card, speakers (2026-11-22)
 
 Status: **partial, speakers work.** The ADSP boots from this phone's own firmware, the whole Q6/LPASS/SoundWire/WCD938x chain probes, the sound card `sm8250 - realme GT Neo 2` registers (8 MultiMedia PCMs, Headset Jack, USB Offload Jack)
-and a test tone plays **clean on both speakers** (owner-verified: top and bottom, a quiet and a louder tone). Flashed in `mainline-boot-5.img`. Not done: microphones, earpiece, headset/USB-C audio, volume control, UCM profile for PulseAudio.
+and a test tone plays **clean on both speakers** (owner-verified: top and bottom, a quiet and a louder tone). Flashed in `mainline-boot-5.img`. A UCM profile (speaker only) lets PulseAudio create a sink, and a tone through it was heard clearly (owner-verified). Not done: microphones, earpiece, headset/USB-C audio, Phosh volume keys/OSD unconfirmed.
 
 ## What was needed
 1. **ADSP firmware** (`tools/extract-dsp-firmware.py`): the stock `modem` partition (FAT image from the 2026-11-16 backup) holds `image/adsp.mdt` + `adsp.b00-b18` (also `cdsp.*`, `slpi.*`). Each set is checked against its MDT header (every segment file present with the declared size).
@@ -18,13 +18,21 @@ and a test tone plays **clean on both speakers** (owner-verified: top and bottom
 Right after the ADSP boots, the AFE service accepts no commands (vote and the first clock `SET_PARAM` rejected with 0x16, ~35 ms after boot); the same commands work minutes later (a manual re-probe of the VA macro succeeded, and then macros, SoundWire and WCD938x bound).
 `q6core_is_adsp_ready()` exists in the tree but nothing calls it, and calling it before the first AFE command did not change the early rejections (it probably reports ready at once), so that patch was dropped. In practice the sequence settles because the macros defer/retry.
 
-## Test procedure (no UCM profile yet)
+## UCM profile (speaker, 2026-11-22)
+Files in `rootfs-overlay/` (installed by `scripts/build_alpine_rootfs.py`, which now copies the whole overlay tree and adds `alsa-ucm-conf` + `pulseaudio-utils`):
+- `usr/share/alsa/ucm2/conf.d/sm8250/realme GT Neo 2.conf`: the file name is the card long name; it just selects the `HiFi` use case.
+- `usr/share/alsa/ucm2/Qualcomm/sm8250/realme-bitra/HiFi.conf`: verb with one `Speaker` device on `hw:${CardId},0`.
+- **Lesson:** the back-end route `TERT_MI2S_RX Audio Mixer MultiMedia1` must be in the *verb* Enable/DisableSequence. With the route in the device sequence PulseAudio probes the PCM first and fails with `Error opening PCM device _ucm0001.hw:r2,0: Invalid argument` / `Failed to find a working profile`.
+- Result: card `alsa_card.platform-sound`, default sink `alsa_output.platform-sound.HiFi__Speaker__sink`; `pactl set-sink-volume @DEFAULT_SINK@ 40%` then `paplay tone.wav` plays with no kernel errors or reset (this also did not reproduce the earlier unexplained reset). `alsaucm` state does not persist across invocations, so check enable/disable within one invocation.
+- Not in the profile: microphones, earpiece, headset/USB-C (wiring unverified).
+
+## Test procedure (manual, without PulseAudio)
 `apk add alsa-utils`; stop PulseAudio (`pkill pulseaudio`: it grabs the card and fails with "Failed to find a working profile"); route and play:
 `amixer -c 0 cset name="TERT_MI2S_RX Audio Mixer MultiMedia1" 1; aplay -D hw:0,0 tone.wav` (`tools/tone.py AMP` writes a 2 s 440 Hz stereo tone; start at amplitude 3000). The speaker amps (2x TFA9874 at 0x34/0x35 on i2c15, "top_spkr/bottom_spkr", Tertiary MI2S RX) have no mixer controls.
 
 ## Open / next
 - **One unexplained reset**: during the very first playback attempt the phone reset (a `reboot ... 'bootloader'` line at 147 s, then it came back on the same test image) while PulseAudio was also grabbing the card; two later runs with PulseAudio stopped played fine. Suspects: PulseAudio probing the PCMs concurrently; not reproduced. Test with PulseAudio/PipeWire playing in Phosh before relying on it.
-- No UCM profile (`alsa-ucm-conf` has no entry for this card): PulseAudio finds no profile, so Phosh has no sound until one is written (speaker on `TERT_MI2S_RX`, WCD capture paths, voice-activation DMIC).
+- UCM covers the speaker only; add capture paths (WCD/VA DMIC), earpiece and headset once the wiring is verified. Confirm Phosh volume keys/OSD with the new sink.
 - Untested: microphones (WCD/VA DMIC/AMIC wiring unverified), earpiece, headset jack events, USB-C audio (FSA4480 + the USB offload jack), volume and speaker protection (TFA amps have no kernel volume; start quiet), Bluetooth audio, calls (modem).
 - Kernel log noise: `qcom-soundwire ...: din-ports/dout-ports mismatch with controller`, `rx_macro: Unsorted reg_defaults`, `AFE failed to vote`, `cpu cpu7: Voltage update failed freq=3187200` (not audio).
 - CDSP and SLPI firmware sets are extracted and verified (CDSP/SLPI regions match) but not enabled; enable one at a time (docs/27).

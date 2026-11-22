@@ -33,7 +33,7 @@ PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", 
             "phosh", "phoc", "phosh-keyboard", "squeekboard", "elogind", "elogind-openrc", "polkit-elogind", "upower", "gnome-console",
             "gnome-session", "gnome-settings-daemon", "iio-sensor-proxy", "feedbackd", "networkmanager", "networkmanager-openrc",
             "networkmanager-wifi", "networkmanager-cli", "tinydm", "tinydm-openrc", "xwayland", "mesa-gl",
-            "alsa-utils", "alsa-utils-openrc"]
+            "alsa-utils", "alsa-utils-openrc", "alsa-ucm-conf", "pulseaudio-utils"]
 TOOLS = [("bitra-reboot", False), ("bitra-failnth", False), ("bitra-drm", True), ("bitra-evtest", True)]
 
 
@@ -338,9 +338,12 @@ def inner(a):
     chroot("/usr/sbin/chpasswd", inp=b"bitra:bitra\n")
     for g in ("video", "input", "render", "seat", "audio"):
         chroot("/usr/sbin/addgroup", "bitra", g)
-    for rel in ("home/bitra/.config/sway/config", "usr/local/bin/bitra-sway-start"):
-        src = ROOT / "rootfs-overlay" / rel
-        put(rel, src.read_bytes(), 0o755 if rel.startswith("usr/") else 0o644)
+    # everything under rootfs-overlay/ (sway config, session launcher, the ALSA UCM profile for the sound card, ...) is copied as is
+    overlay = ROOT / "rootfs-overlay"
+    for src in sorted(overlay.rglob("*")):
+        if src.is_file():
+            rel = str(src.relative_to(overlay))
+            put(rel, src.read_bytes(), 0o755 if rel.startswith("usr/local/bin/") else 0o644)
     chroot("/bin/chown", "-R", "1000:1000", "/home/bitra")
     # Phosh: tinydm autologin (uid 1000 = bitra) starts the phosh session; NetworkManager must not touch the USB gadget link
     put("var/lib/tinydm/default-session.desktop", "", 0o644)
