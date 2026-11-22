@@ -42,3 +42,10 @@ Logged 2026-11-21. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (s
 - Under fault injection: `refcount_t underflow` in `drm_dev_put()` from `drm_self_refresh_helper_entry_work` and a KASAN null-ptr-deref in `msm_drm_uninit -> dsi_unbind -> msm_dsi_tx_buf_free -> update_lru_locked` (dev_private already NULL after a failed `msm_drm_init`). Needs the fail-nth sweep to attribute.
 - **Phone unreachable after `soak.sh failnth 1 6`** (see docs/23): needs a manual power cycle; cause unknown.
 - Fixed in our tree (upstream candidates): typec altmode descriptor not zeroed (UBSAN), DPU self-refresh helper leak (512 B x 2 per DRM bring-up), qcom-wdt not marking an armed watchdog as running.
+
+## Parked by the owner (2026-11-22) — fault-injection sweep, resume after the bootable-OS milestone
+State: kernel fork `bitra` at 593dc5215 (candidates #1-#14 in docs/24); image `releases/t-dbg10.img` = debug kernel with all fixes.
+- fail-nth clean so far: N=1..400 (t-dbg6), 401..699 stride 7, 770..790 (all t-dbg10), 850..3000 stride 50.
+- To do: understand why `left` stays 0 up to N=3000 (real end of the bind's allocations not found; check the semantics of `left` for large N); re-run N=1..400 and a full 746..900 on t-dbg10; then other drivers (UFS, ath11k, panel) with the same helper.
+- Open upstream-side items: devcoredump pinning drm_device (#10), msm_gem.c:170 (#11), "encoder is disabled" (#12), rpmh.c:386 WARN from sugov (new, unexamined).
+- Resume with: `ssh mac "sh 'soak.sh failnth FROM TO OUT [STEP]'"` on a t-dbgN RAM boot (docs/23).
