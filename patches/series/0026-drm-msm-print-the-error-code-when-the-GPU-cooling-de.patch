@@ -1,7 +1,7 @@
 From cbd6be89f670e6528945c57d83d17a5ed8110be1 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 17:40:58 +0530
-Subject: [PATCH 26/31] drm/msm: print the error code when the GPU cooling
+Subject: [PATCH 26/32] drm/msm: print the error code when the GPU cooling
  device cannot be registered
 
 Without CONFIG_DEVFREQ_THERMAL of_devfreq_cooling_register() is a stub returning -EINVAL, which the

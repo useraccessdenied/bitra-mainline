@@ -38,3 +38,26 @@ Gotchas found on the way:
 - NFC: `tools/bitra-nfc.py` talks to the kernel NFC generic-netlink family directly (DEV_UP, START_POLL, GET_TARGET); detected an ISO14443-A target (ATQA 0400, SAK 20, UID 08a5b523).
   Pitfall found: a netlink request with NLM_F_ACK leaves an ACK in the socket; read replies in a loop (the first datagram may just be the ack).
 - The image builder now also installs curl, i2c-tools, evtest and python3 and copies `tools/*.py` to `/usr/local/bin`, so a rebuilt image matches the live system.
+
+## Charger state read from the MP2650 (2026-11-22, read-only)
+`i2c5` (qupv3 se5, 400 kHz) is now enabled in the DT (no driver binds the MP2650 @0x5c; `tools/mp2650-status.py` reads it with `i2cget`, nothing is written). The register layout comes from the Oplus driver in the workspace vendor kernel (`roms/droidian/kernel/drivers/power/oplus/charger_ic/oplus_mp2650.[ch]`); the stock charging parameters of **this** phone are in `roms/droidian/kernel/arch/arm64/boot/dts/vendor/oplus/bitra/kona-mtp.dtsi` (`&pm8150b_charger`, `mp2650-charger@5c`).
+
+What the bootloader left programmed (and Linux inherits, since nothing touches the chip):
+
+| Setting | Value on the phone now | Stock (bitra vendor DT / driver) |
+|---|---|---|
+| Input current limit (reg00) | `0x1e` = **1500 mA** | USB SDP 500 mA, CDP 1500 mA, standard/PD/QC charger **2000 mA** |
+| Input voltage limit VINDPM (reg01) | 4.5 V | default |
+| **Charge current** (reg02) | `0x06` = **300 mA** | normal temp window **1100 mA** (PD/QC 2000 mA), cool/little cold 1100 mA, cold 300 mA, warm lower |
+| Termination / precharge (reg03) | 200 mA / 600 mA | iterm 135 mA |
+| **Float voltage per cell** (reg04) | `0x68` -> **4362.5 mV** (2S pack: 8.725 V) | **4435 mV** (cold 3980 mV); stock `oplus_batt_4400mv` |
+| Charging enabled / OTG boost / battery FET (reg08) | on / **off** / on | |
+| Watchdog (reg09) | **disabled** (settings persist); 12 h fast-charge timer on, termination on | |
+| 2-cell battery select, precharge threshold (reg07) | 2 cells, 6.8 V | |
+
+Reading it: the inherited state is conservative on **voltage** (below the stock float voltage, which is also kind to this worn pack: 1695 cycles, 1480 of 2465 mAh = 60 % health) but slow on **current**: 300 mA into the pack is roughly 5 hours for the remaining capacity, against ~1.1-2 A in the stock normal-charge path. The watchdog being disabled means the bootloader's values stay until power is lost, and also that any value written would persist (no automatic fall back); the 12 h charge timer is the only built-in backstop. The PM8150B `smb5` is not bound (no power-supply device from it), so charger-type detection (SDP/CDP/DCP/PD) is not visible to Linux either; the USB psy (`tcpm-source-psy`) only reports the PD contract (5 V / 3 A with the Mac).
+
+Fast charging proper (SuperVOOC, 65 W) is a proprietary handshake with the RK826 MCU (i2c16 @0x0a) and the adapter: not reproducible. A standard-charger improvement would be raising the MP2650 charge current within the stock limits; this needs a policy (temperature windows, input limit per charger type, termination) and is **not done**: nothing writes the charger.
+
+Battery snapshot at the time: 97 % (8.617 V, 0 mA, "Not charging" = full), 35 C.
+

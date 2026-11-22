@@ -1,0 +1,28 @@
+From 328fcbd3be9eef469465bc83eee458fbb745943a Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 22:09:47 +0530
+Subject: [PATCH 32/32] arm64: dts: qcom: sm8250-realme-bitra: enable i2c5
+ (MP2650 charger bus, read-only access)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index d60a1861c..241343ee3 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -305,3 +305,12 @@ &slpi {
+ 	firmware-name = "qcom/sm8250/realme/bitra/slpi.mdt";
+ 	status = "okay";
+ };
++
++/*
++ * i2c5 carries the MP2650 main charger (@0x5c; stock: oplus,mp2650-charger, 400 kHz). No driver binds it: the bus is enabled so that its
++ * registers can be read (read-only, i2c-dev) to see what the bootloader programmed (docs/26).
++ */
++&i2c5 {
++	clock-frequency = <400000>;
++	status = "okay";
++};

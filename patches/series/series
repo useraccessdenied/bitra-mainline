@@ -29,3 +29,4 @@
 0029-arm64-dts-qcom-sm8250-realme-bitra-third-DMIC-pin-pa.patch
 0030-arm64-dts-qcom-sm8250-realme-bitra-enable-the-SLPI-r.patch
 0031-arm64-dts-qcom-sm8250-realme-bitra-USB-dual-role-dro.patch
+0032-arm64-dts-qcom-sm8250-realme-bitra-enable-i2c5-MP265.patch

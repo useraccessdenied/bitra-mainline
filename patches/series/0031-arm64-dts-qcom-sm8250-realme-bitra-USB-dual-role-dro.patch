@@ -1,7 +1,7 @@
 From 087f2a47badb0cb0ca356f2f80b248924ff43b54 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 22:05:38 +0530
-Subject: [PATCH 31/31] arm64: dts: qcom: sm8250-realme-bitra: USB dual-role
+Subject: [PATCH 31/32] arm64: dts: qcom: sm8250-realme-bitra: USB dual-role
  (drop the forced peripheral mode) and the MP2650 OTG enable as the Type-C
  VBUS supply (untested in host mode)
 

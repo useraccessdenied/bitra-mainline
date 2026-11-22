@@ -1,7 +1,7 @@
 From 54f0bd481dd7c2547a021278f257f286d4846d36 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 03:28:31 +0530
-Subject: [PATCH 10/31] synaptics_tcm_i2c: harden against issues raised in the
+Subject: [PATCH 10/32] synaptics_tcm_i2c: harden against issues raised in the
  automated review of the posting
 
 - syna_get_bits(): do the bounds check in 64 bits so offset + bits cannot wrap.
