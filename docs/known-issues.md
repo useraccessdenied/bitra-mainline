@@ -77,3 +77,8 @@ Standby is ~55-65 mA (about 1 day on the worn 1480 mAh pack) and `qcom_stats` ao
 - `typec_displayport ... probe failed with error -71` when a USB-C partner attaches (DP alt mode, USB-C/PD work is open).
 - Wi-Fi is now managed by NetworkManager; `bitra-wifi`/`wpa_supplicant.conf` remain only as the source for `tools/nm-wifi-from-wpa.py`. A Wi-Fi password is still never baked into images.
 - Phosh needs display buffers divisible by its scale 3 (client issue only).
+
+## Deferred by the owner (2026-11-22): hours-long GPU testing
+To do later (not now): a multi-hour GPU soak. Include: sustained mixed Vulkan/GLES load for hours with the sampler (`tools/gpu-stress.sh`, longer `LOAD_S`) logging freq/temps/throttle state/battery;
+GPU load combined with repeated suspend/resume cycles; other GPU fault types (iommu/page faults, repeated deliberate hangs with `tools/gpu-hang-test.py hang`, hang while Phosh animates); GPU power draw on battery;
+check that the cooling device actually throttles when the thermal trips are reached (force a hot run or lower a trip), memory leaks across hours (`/proc/meminfo`, dmesg), and the `sync_state` wait on the GMU. Baseline for comparison: docs/29 'GPU tests' (5 min, peak 60 C, no throttling needed).
