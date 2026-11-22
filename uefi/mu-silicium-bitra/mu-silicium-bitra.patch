@@ -1,0 +1,37 @@
+diff --git a/Binaries b/Binaries
+--- a/Binaries
++++ b/Binaries
+@@ -1 +1 @@
+-Subproject commit f878f9911485d606060a08c098f25e8dd0de1324
++Subproject commit f878f9911485d606060a08c098f25e8dd0de1324-dirty
+diff --git a/Mu_Basecore b/Mu_Basecore
+--- a/Mu_Basecore
++++ b/Mu_Basecore
+@@ -1 +1 @@
+-Subproject commit c96049e1353260dadb7477a5ab70dec868db6c65
++Subproject commit c96049e1353260dadb7477a5ab70dec868db6c65-dirty
+diff --git a/Platforms/Realme/bitraPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c b/Platforms/Realme/bitraPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c
+index 526139a..e18c4c9 100644
+--- a/Platforms/Realme/bitraPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c
++++ b/Platforms/Realme/bitraPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c
+@@ -23,7 +23,7 @@ gConfigurationDescriptor[] = {
+   {"Sdc1GpioConfigOff", 0xA00},
+   {"Sdc2GpioConfigOff", 0xA00},
+   {"EnableSDHCSwitch", 0x1},
+-  {"EnableUfsIOC", 0},
++  {"EnableUfsIOC", 1},
+   {"UfsSmmuConfigForOtherBootDev", 1},
+   {"SecurityFlag", 0xC4},
+   {"EnableLogFsSyncInRetail", 0x0},
+diff --git a/Platforms/Realme/bitraPkg/bitra.dsc b/Platforms/Realme/bitraPkg/bitra.dsc
+index bae6bc7..556e382 100644
+--- a/Platforms/Realme/bitraPkg/bitra.dsc
++++ b/Platforms/Realme/bitraPkg/bitra.dsc
+@@ -61,6 +61,7 @@
+   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1080
+   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|2400
+   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|32
++  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferDelay|150000
+ 
+   #
+   # Platform PEI

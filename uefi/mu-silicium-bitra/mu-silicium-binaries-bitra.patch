@@ -1,0 +1,13 @@
+diff --git a/bitra/RawFiles/uefipil.cfg b/bitra/RawFiles/uefipil.cfg
+index 27dd431..137a58b 100644
+--- a/bitra/RawFiles/uefipil.cfg
++++ b/bitra/RawFiles/uefipil.cfg
+@@ -37,7 +37,7 @@ ImageFv
+ ########################################################################\
+ 
+ [AUTO]
+-ABL
++#ABL (disabled for bitra RAM-boot test)
+ 
+ ########################################################################
+ ## 

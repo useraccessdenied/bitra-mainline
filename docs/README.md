@@ -6,6 +6,7 @@ Numbering continues the `bitra` workspace docs (00–17 cover LineageOS and Droi
 |---|---|
 | [31-audio.md](31-audio.md) | ADSP firmware, sound card (model/routing/DP link), speaker playback and bottom microphone (UCM, PulseAudio), top-mic search, open items |
 | [33-usb-typec.md](33-usb-typec.md) | Type-C dual-role, OTG power (MP2650 enable gpio), what is verified and what is not |
+| [34-uefi-xnu.md](34-uefi-xnu.md) | Mu-Silicium UEFI on bitra (RAM-boot reaches the boot manager) and the HakiOS / XNU review |
 | [32-sensors.md](32-sensors.md) | SLPI remoteproc, hexagonrpcd (FastRPC) and the Sensor Core; accelerometer and gyroscope working (what it takes), open sensors |
 | [30-phosh.md](30-phosh.md) | Phosh session (tinydm/elogind/NetworkManager/UPower), the cgroup cmdline fix, open items |
 | [29-graphics-gpu.md](29-graphics-gpu.md) | Sway on the panel (touch, keys, 120 Hz) and Adreno 650 acceleration (freedreno/turnip), firmware pitfalls |
