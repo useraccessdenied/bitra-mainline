@@ -1,7 +1,7 @@
 From 83e8464809160a26a0585983194e6d05d08a8406 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 03:19:13 +0530
-Subject: [PATCH 09/27] Input: synaptics_tcm_i2c - add Synaptics TouchComm I2C
+Subject: [PATCH 09/28] Input: synaptics_tcm_i2c - add Synaptics TouchComm I2C
  touchscreen driver (as posted by Vsevolod Nevorotov, 2026-09-10, unmerged)
 
 Imported unmodified from the linux-input posting (20260910070723.347768-3-sevanevorotov29@gmail.com) for testing on the realme GT Neo 2; Makefile hunk re-done by hand.

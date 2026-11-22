@@ -1,0 +1,30 @@
+From c96f946a1d5c785582f3dcc257aaf667a95e9103 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 19:30:40 +0530
+Subject: [PATCH 28/28] arm64: dts: qcom: sm8250-realme-bitra: route
+ AMIC1/3/4/5 to their mic biases (as stock)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 9ac47d564..7c34fb0f3 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -179,9 +179,13 @@ &adsp {
+  */
+ &sound {
+ 	model = "realme GT Neo 2";
+-	/* WCD938x mic bias / ADC / DMIC / headphone routing, starting point copied from the OnePlus 8T (same codec); bitra's actual mic wiring is unverified */
++	/* WCD938x mic bias / ADC / DMIC / headphone routing, starting point copied from the OnePlus 8T (same codec); AMIC1..5 -> MIC BIAS routing as in the stock realme DT; stock reads the two analog mics via ADC1 (IN1) and ADC4 (INP5) */
+ 	audio-routing =
++		"AMIC1", "MIC BIAS1",
+ 		"AMIC2", "MIC BIAS2",
++		"AMIC3", "MIC BIAS3",
++		"AMIC4", "MIC BIAS3",
++		"AMIC5", "MIC BIAS4",
+ 		"TX DMIC0", "MIC BIAS1",
+ 		"TX DMIC1", "MIC BIAS1",
+ 		"TX DMIC2", "MIC BIAS4",

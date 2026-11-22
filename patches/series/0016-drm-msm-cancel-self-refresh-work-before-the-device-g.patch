@@ -1,7 +1,7 @@
 From 584df0429a90a9073ddb1c07543ea2ee3e6e0c8e Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 12:24:45 +0530
-Subject: [PATCH 16/27] drm/msm: cancel self-refresh work before the device
+Subject: [PATCH 16/28] drm/msm: cancel self-refresh work before the device
  goes away, clear stale event worker pointers
 
 Found with a deterministic fail-nth sweep over the panel probe on a KASAN kernel:

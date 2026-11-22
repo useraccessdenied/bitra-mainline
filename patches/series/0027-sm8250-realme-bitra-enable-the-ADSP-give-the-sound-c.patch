@@ -1,7 +1,7 @@
 From fa4f69bf1ae84d70e1e0793650a1dc26c080c1c8 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 19:11:47 +0530
-Subject: [PATCH 27/27] sm8250-realme-bitra: enable the ADSP, give the sound
+Subject: [PATCH 27/28] sm8250-realme-bitra: enable the ADSP, give the sound
  card a model and routing, drop the DisplayPort link; q6afe: do not wait 3 s
  for a rejected LPASS vote
 
