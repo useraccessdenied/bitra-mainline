@@ -1,0 +1,6 @@
+# realme GT Neo 2: the only working microphone is mono (bottom mic on WCD938x ADC1), but the capture PCM is opened as stereo and the
+# second channel is silent. Expose a stereo source that carries the mic on both channels and make it the default (docs/31).
+.nofail
+load-module module-remap-source source_name=bitra_mic source_properties=device.description=Microphone master=alsa_input.platform-sound.HiFi__Mic__source master_channel_map=front-left,front-left channel_map=front-left,front-right remix=no
+set-default-source bitra_mic
+.fail
