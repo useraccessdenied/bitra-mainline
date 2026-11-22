@@ -68,3 +68,6 @@ State: kernel fork `bitra` at 593dc5215 (candidates #1-#14 in docs/24); image `r
 (Update: reproduced and narrowed down, see docs/28 'Hangs found while bisecting': a removed-PCIe/pwrseq combination, not the radios being off.) Unknown whether it hung entering suspend (PCIe root port 0000:00:00.0 left without its endpoint/power sequencer, `1c00000.pcie` runtime state) or in resume. Not caused by the radios being "off" (rfkill suspends fine).
 Next: redo the bisect on the flashed kernel (a hang now reboots into Alpine), unbind in smaller steps (BT alone, then ath11k alone, then pwrseq), keep a console log (`no_console_suspend`, ramoops `console-ramoops` after the reset).
 Also: the boot partition used to hold Droidian; it now holds the mainline image (docs/25).
+
+## Parked by the owner (2026-11-22): system sleep (AOSD/CXSD/DDR)
+Standby is ~55-65 mA (about 1 day on the worn 1480 mAh pack) and `qcom_stats` aosd/cxsd/ddr stay 0; stock Android had similar battery life, so this is not a regression. Findings, sources and the cheap experiments left are in docs/28. Resume with `tools/sleepstat.sh` around a suspend.

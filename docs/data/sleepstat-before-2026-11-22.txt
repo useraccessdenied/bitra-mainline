@@ -1,0 +1,45 @@
+== Sun Nov 22 11:18:32 UTC 2026 before
+aosd Count: 0
+cxsd Count: 0
+ddr Count: 0
+-- ddr freq (count)
+768Mhz: CP IDX:7 count:2445
+1017Mhz: CP IDX:8 count:1542
+1353Mhz: CP IDX:9 count:626
+1555Mhz: CP IDX:10 count:326
+1804Mhz: CP IDX:11 count:43
+2092Mhz: CP IDX:12 count:941
+-- cluster idle
+State  Time(ms)       Usage      Rejected   Above      Below      S2idle
+S0     85615          7671       748        3460       0          0
+-- genpd cx/mx/mmcx (perf level)
+mx                              on                              48
+mmcx                            on                              256
+cx                              on                              48
+-- interconnect nodes with avg or peak > 0 (parents only)
+epss_l3_master@18590000.interconnect                  0     39321600
+epss_l3_slave@18590000.interconnect                   0     39321600
+qup1_core_master@interconnect-qup-virt                1            1
+qup1_core_slave@interconnect-qup-virt                 1            1
+qnm_snoc@1500000.interconnect                       115        40000
+qhs_qup1@1500000.interconnect                       115          115
+qhs_usb3_0@1500000.interconnect                       0        40000
+qnm_aggre1_noc@1620000.interconnect             1000000      2500000
+qnm_gemnoc@1620000.interconnect                     115        40000
+qns_cnoc@1620000.interconnect                       115        40000
+qns_gemnoc_sf@1620000.interconnect              1000000      2500000
+llcc_mc@163d000.interconnect                    3269346      5412000
+ebi@163d000.interconnect                        3269346      5412000
+xm_usb3_0@16e0000.interconnect                  1000000      2500000
+qns_a1noc_snoc@16e0000.interconnect             1000000      2500000
+qxm_mdp0@1740000.interconnect                   1134673       800000
+qxm_mdp1@1740000.interconnect                   1134673       800000
+qns_mem_noc_hf@1740000.interconnect             2269346       800000
+chm_apps@9100000.interconnect                       115      5412000
+qnm_mnoc_hf@9100000.interconnect                2269346       800000
+qnm_snoc_sf@9100000.interconnect                1000000      2500000
+qns_gem_noc_snoc@9100000.interconnect               115        40000
+qns_llcc@9100000.interconnect                   3269346      5412000
+-- cpuidle cpu0
+WFI usage=18805 time=24322703
+cpu-sleep-0-0 usage=18617 time=158861054
