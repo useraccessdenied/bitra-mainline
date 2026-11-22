@@ -1,7 +1,7 @@
 # 31 — Audio: ADSP firmware, sound card, speakers (2026-11-22)
 
 Status: **partial, speakers work.** The ADSP boots from this phone's own firmware, the whole Q6/LPASS/SoundWire/WCD938x chain probes, the sound card `sm8250 - realme GT Neo 2` registers (8 MultiMedia PCMs, Headset Jack, USB Offload Jack)
-and a test tone plays **clean on both speakers** (owner-verified: top and bottom, a quiet and a louder tone). Flashed in `mainline-boot-5.img`. A UCM profile (speaker only) lets PulseAudio create a sink, and a tone through it was heard clearly (owner-verified). Not done: microphones, earpiece, headset/USB-C audio, Phosh volume keys/OSD unconfirmed.
+and a test tone plays **clean on both speakers** (owner-verified: top and bottom, a quiet and a louder tone). First flashed in `mainline-boot-5.img`; the microphone DT changes are in `mainline-boot-6.img` (docs/25). A UCM profile (speaker only) lets PulseAudio create a sink, and a tone through it was heard clearly (owner-verified). Not done: microphones, earpiece, headset/USB-C audio, Phosh volume keys/OSD unconfirmed.
 
 ## What was needed
 1. **ADSP firmware** (`tools/extract-dsp-firmware.py`): the stock `modem` partition (FAT image from the 2026-11-16 backup) holds `image/adsp.mdt` + `adsp.b00-b18` (also `cdsp.*`, `slpi.*`). Each set is checked against its MDT header (every segment file present with the declared size).
