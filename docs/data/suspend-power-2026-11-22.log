@@ -1,0 +1,79 @@
+== Sun Nov 22 07:58:35 UTC 2026 suspend-power SHORT=120 LONG=900 kernel 7.2.0-g2cecd2883092
+WAITING for you to UNPLUG USB (up to 15 min). After that: ~4 min idle stages (screen stays on), then suspend stages (screen goes dark), ~40 min total. DO NOT TOUCH the phone.
+unplugged rtc=1442340 st=Discharging v=8435000 i=-19000 p=-140000 q=1197000 cap=81 T=371
+unplug detected, settling 20 s. Stages A,B (idle, ~3 min) first - screen stays on for A, backlight off for B
+A: idle, screen ON (90 s)
+A t=5 rtc=1442360 st=Discharging v=8429000 i=-100000 p=-830000 q=1196000 cap=81 T=370
+A t=10 rtc=1442365 st=Discharging v=8424000 i=-108000 p=-900000 q=1196000 cap=81 T=370
+A t=15 rtc=1442370 st=Discharging v=8419000 i=-114000 p=-960000 q=1196000 cap=81 T=370
+A t=20 rtc=1442375 st=Discharging v=8423000 i=-118000 p=-990000 q=1195000 cap=81 T=369
+A t=25 rtc=1442380 st=Discharging v=8418000 i=-129000 p=-1090000 q=1195000 cap=81 T=369
+A t=30 rtc=1442385 st=Discharging v=8422000 i=-129000 p=-1090000 q=1195000 cap=81 T=368
+A t=35 rtc=1442390 st=Discharging v=8419000 i=-128000 p=-1080000 q=1195000 cap=81 T=368
+A t=40 rtc=1442395 st=Discharging v=8415000 i=-129000 p=-1080000 q=1195000 cap=81 T=368
+A t=45 rtc=1442400 st=Discharging v=8419000 i=-129000 p=-1080000 q=1194000 cap=81 T=368
+A t=50 rtc=1442405 st=Discharging v=8411000 i=-129000 p=-1090000 q=1194000 cap=81 T=367
+A t=55 rtc=1442410 st=Discharging v=8411000 i=-130000 p=-1090000 q=1194000 cap=81 T=367
+A t=60 rtc=1442415 st=Discharging v=8414000 i=-129000 p=-1080000 q=1194000 cap=81 T=367
+A t=65 rtc=1442420 st=Discharging v=8408000 i=-129000 p=-1080000 q=1194000 cap=81 T=367
+A t=70 rtc=1442426 st=Discharging v=8407000 i=-129000 p=-1090000 q=1193000 cap=81 T=366
+A t=75 rtc=1442431 st=Discharging v=8406000 i=-129000 p=-1090000 q=1193000 cap=81 T=366
+A t=80 rtc=1442436 st=Discharging v=8406000 i=-129000 p=-1080000 q=1193000 cap=81 T=366
+A t=85 rtc=1442441 st=Discharging v=8407000 i=-129000 p=-1080000 q=1193000 cap=81 T=366
+A t=90 rtc=1442446 st=Discharging v=8402000 i=-129000 p=-1090000 q=1193000 cap=81 T=365
+B: idle, backlight OFF (90 s)
+B t=5 rtc=1442451 st=Discharging v=8399000 i=-129000 p=-1090000 q=1192000 cap=81 T=365
+B t=10 rtc=1442456 st=Discharging v=8410000 i=-127000 p=-1070000 q=1192000 cap=81 T=365
+B t=15 rtc=1442461 st=Discharging v=8405000 i=-127000 p=-1070000 q=1192000 cap=81 T=365
+B t=20 rtc=1442466 st=Discharging v=8399000 i=-131000 p=-1100000 q=1192000 cap=81 T=365
+B t=25 rtc=1442471 st=Discharging v=8407000 i=-129000 p=-1090000 q=1191000 cap=81 T=364
+B t=30 rtc=1442476 st=Discharging v=8401000 i=-127000 p=-1070000 q=1191000 cap=81 T=364
+B t=35 rtc=1442481 st=Discharging v=8404000 i=-126000 p=-1060000 q=1191000 cap=81 T=364
+B t=40 rtc=1442486 st=Discharging v=8401000 i=-125000 p=-1050000 q=1191000 cap=81 T=364
+B t=45 rtc=1442491 st=Discharging v=8398000 i=-125000 p=-1050000 q=1191000 cap=81 T=363
+B t=50 rtc=1442496 st=Discharging v=8405000 i=-125000 p=-1050000 q=1190000 cap=81 T=363
+B t=55 rtc=1442501 st=Discharging v=8398000 i=-124000 p=-1040000 q=1190000 cap=81 T=363
+B t=60 rtc=1442506 st=Discharging v=8398000 i=-123000 p=-1040000 q=1190000 cap=81 T=363
+B t=65 rtc=1442511 st=Discharging v=8401000 i=-123000 p=-1040000 q=1190000 cap=81 T=363
+B t=70 rtc=1442516 st=Discharging v=8396000 i=-123000 p=-1040000 q=1190000 cap=81 T=362
+B t=75 rtc=1442521 st=Discharging v=8394000 i=-123000 p=-1030000 q=1189000 cap=81 T=362
+B t=80 rtc=1442526 st=Discharging v=8397000 i=-123000 p=-1030000 q=1189000 cap=81 T=362
+B t=85 rtc=1442531 st=Discharging v=8394000 i=-124000 p=-1040000 q=1189000 cap=81 T=362
+B t=90 rtc=1442536 st=Discharging v=8398000 i=-123000 p=-1030000 q=1189000 cap=81 T=362
+C: SUSPEND 120s with Wi-Fi up (screen dark, do not touch)
+C before-suspend rtc=1442541 st=Discharging v=8392000 i=-123000 p=-1030000 q=1189000 cap=81 T=362
+C after-resume+0s rtc=1442663 st=Discharging v=8371000 i=-70000 p=-580000 q=1186000 cap=81 T=356
+C after-resume+1s rtc=1442664 st=Discharging v=8337000 i=-172000 p=-1430000 q=1186000 cap=81 T=355
+C after-resume+2s rtc=1442665 st=Discharging v=8342000 i=-175000 p=-1460000 q=1186000 cap=81 T=355
+C after-resume+4s rtc=1442667 st=Discharging v=8380000 i=-178000 p=-1490000 q=1186000 cap=81 T=355
+C after-resume+8s rtc=1442671 st=Discharging v=8380000 i=-168000 p=-1400000 q=1186000 cap=81 T=355
+C after-resume+15s rtc=1442678 st=Discharging v=8380000 i=-154000 p=-1290000 q=1185000 cap=81 T=355
+D: SUSPEND 120s with Wi-Fi down
+D before-suspend rtc=1442678 st=Discharging v=8386000 i=-154000 p=-1290000 q=1185000 cap=81 T=355
+D after-resume+0s rtc=1442800 st=Discharging v=8361000 i=-69000 p=-570000 q=1183000 cap=80 T=350
+D after-resume+1s rtc=1442801 st=Discharging v=8329000 i=-77000 p=-650000 q=1182000 cap=80 T=350
+D after-resume+2s rtc=1442802 st=Discharging v=8326000 i=-87000 p=-730000 q=1182000 cap=80 T=350
+D after-resume+4s rtc=1442804 st=Discharging v=8337000 i=-104000 p=-870000 q=1182000 cap=80 T=350
+D after-resume+8s rtc=1442808 st=Discharging v=8333000 i=-130000 p=-1090000 q=1182000 cap=80 T=350
+D after-resume+15s rtc=1442815 st=Discharging v=8331000 i=-161000 p=-1340000 q=1182000 cap=80 T=350
+E: SUSPEND 900s with Wi-Fi down (long stage)
+E before-suspend rtc=1442815 st=Discharging v=8331000 i=-161000 p=-1340000 q=1182000 cap=80 T=350
+E after-resume+0s rtc=1443717 st=Discharging v=8272000 i=-133000 p=-1110000 q=1142000 cap=78 T=348
+E after-resume+1s rtc=1443718 st=Discharging v=8252000 i=-139000 p=-1150000 q=1142000 cap=78 T=348
+E after-resume+2s rtc=1443719 st=Discharging v=8252000 i=-145000 p=-1200000 q=1142000 cap=78 T=348
+E after-resume+4s rtc=1443721 st=Discharging v=8264000 i=-154000 p=-1270000 q=1142000 cap=78 T=348
+E after-resume+8s rtc=1443725 st=Discharging v=8257000 i=-168000 p=-1390000 q=1142000 cap=78 T=348
+E after-resume+15s rtc=1443732 st=Discharging v=8254000 i=-185000 p=-1530000 q=1141000 cap=78 T=348
+F: SUSPEND 900s with Wi-Fi up (long stage)
+F before-suspend rtc=1443758 st=Discharging v=8296000 i=-138000 p=-1140000 q=1140000 cap=78 T=348
+F after-resume+0s rtc=1444660 st=Discharging v=8261000 i=-71000 p=-590000 q=1120000 cap=76 T=333
+F after-resume+1s rtc=1444661 st=Discharging v=8219000 i=-81000 p=-680000 q=1120000 cap=76 T=333
+F after-resume+2s rtc=1444662 st=Discharging v=8231000 i=-90000 p=-750000 q=1120000 cap=76 T=333
+F after-resume+4s rtc=1444664 st=Discharging v=8271000 i=-103000 p=-850000 q=1120000 cap=76 T=333
+F after-resume+8s rtc=1444668 st=Discharging v=8274000 i=-111000 p=-920000 q=1120000 cap=76 T=333
+F after-resume+15s rtc=1444675 st=Discharging v=8265000 i=-119000 p=-990000 q=1119000 cap=76 T=333
+-- summary (dQ over the long stages, mAh*1000 -> mA)
+E: q 1182000 -> 1141000 uAh over 917 s => 160 mA average (incl. the 15 s awake tail)
+F: q 1140000 -> 1119000 uAh over 917 s => 82 mA average (incl. the 15 s awake tail)
+ALL DONE - you can replug USB now
+== done (replug USB)
