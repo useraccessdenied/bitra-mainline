@@ -1,0 +1,77 @@
+From f04411f423320487c59d583a9aef9255276ad848 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 20:10:52 +0530
+Subject: [PATCH 29/29] arm64: dts: qcom: sm8250-realme-bitra: third DMIC pin
+ pair (gpio12/13) and stock VA DMIC bias routes
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../boot/dts/qcom/sm8250-realme-bitra.dts     | 50 ++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 7c34fb0f3..287c0add3 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -218,9 +218,9 @@ &sound {
+ 		"RX_TX DEC2_INP", "TX DEC2 MUX",
+ 		"RX_TX DEC3_INP", "TX DEC3 MUX",
+ 		"VA DMIC0", "VA MIC BIAS3",
+-		"VA DMIC1", "VA MIC BIAS1",
++		"VA DMIC1", "VA MIC BIAS3",
+ 		"VA DMIC2", "VA MIC BIAS1",
+-		"VA DMIC3", "VA MIC BIAS3",
++		"VA DMIC3", "VA MIC BIAS1",
+ 		"VA DMIC4", "VA MIC BIAS4",
+ 		"VA DMIC5", "VA MIC BIAS4",
+ 		"VA SWR_ADC0", "ADC1_OUTPUT",
+@@ -237,3 +237,49 @@ &sound {
+ 		"VA SWR_MIC7", "DMIC8_OUTPUT";
+ 	/delete-node/ displayport-dai-link;
+ };
++
++/*
++ * The stock realme DT enables three DMIC pin pairs (gpio6/7, gpio8/9 and gpio12/13) and its three-microphone setups use DMIC1, DMIC3 and
++ * DMIC4; the OnePlus common file only configures the first two. Add the third pair and route the VA DMIC supplies as the stock DT does.
++ */
++&lpass_tlmm {
++	dmic45_active: dmic45-active-state {
++		clk-pins {
++			pins = "gpio12";
++			function = "dmic3_clk";
++			drive-strength = <8>;
++			output-high;
++		};
++
++		data-pins {
++			pins = "gpio13";
++			function = "dmic3_data";
++			drive-strength = <8>;
++			input-enable;
++		};
++	};
++
++	dmic45_sleep: dmic45-sleep-state {
++		clk-pins {
++			pins = "gpio12";
++			function = "dmic3_clk";
++			drive-strength = <2>;
++			bias-disable;
++			output-low;
++		};
++
++		data-pins {
++			pins = "gpio13";
++			function = "dmic3_data";
++			drive-strength = <2>;
++			bias-pull-down;
++			input-enable;
++		};
++	};
++};
++
++&vamacro {
++	pinctrl-0 = <&dmic01_active>, <&dmic23_active>, <&dmic45_active>;
++	pinctrl-1 = <&dmic01_sleep>, <&dmic23_sleep>, <&dmic45_sleep>;
++	pinctrl-names = "default", "sleep";
++};

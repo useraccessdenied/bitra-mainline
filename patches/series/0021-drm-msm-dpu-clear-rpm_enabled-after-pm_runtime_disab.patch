@@ -1,7 +1,7 @@
 From 593dc521516f07251ac2988182fd24049d0b1f75 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 23:20:17 +0530
-Subject: [PATCH 21/28] drm/msm/dpu: clear rpm_enabled after pm_runtime_disable
+Subject: [PATCH 21/29] drm/msm/dpu: clear rpm_enabled after pm_runtime_disable
 
 struct dpu_kms outlives a single bind, but dpu_kms_destroy() left rpm_enabled
 set after disabling runtime PM. A later bind failing before dpu_kms_init()

@@ -1,7 +1,7 @@
 From 02b0c9d65ac5be5a2090c5eb0ec3afa297ae9a93 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:48:28 +0530
-Subject: [PATCH 07/28] ams662zs01: power the panel down if the PPS transfer
+Subject: [PATCH 07/29] ams662zs01: power the panel down if the PPS transfer
  fails; drop the connector pointer on remove
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
