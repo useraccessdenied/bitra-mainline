@@ -1,5 +1,7 @@
 # Known issues / to do later (mainline bring-up)
 
+> Per-hardware status of everything found so far lives in **docs/27-hardware-status.md**; this file holds the detailed open items.
+
 Logged 2026-11-21. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (see docs/18).
 
 ## Display (marked for later by the owner)

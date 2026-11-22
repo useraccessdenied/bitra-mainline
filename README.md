@@ -15,3 +15,4 @@ Everything is experimental and AI-assisted (see AI_DISCLOSURE.md). RAM boots onl
 
 - `docs/21-ufs.md` — UFS storage on mainline; `docs/22-touchscreen.md` — touchscreen research and effort estimate; `docs/known-issues.md` — open items.
 - `scripts/build_alpine_rootfs.py` — Alpine rootfs image (no sudo); `docs/25-alpine-rootfs.md` — how it boots and was flashed.
+- `docs/27-hardware-status.md` — **hardware status tracker** (working / partial / not working / untested for every block); keep it updated.
