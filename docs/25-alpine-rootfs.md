@@ -34,3 +34,7 @@ The phone has no RTC (`/sys/class/rtc` is empty), so it boots at 1970-01-01 and 
 then loops `ntpd -q` in the background until a server answers and saves the time (also saved on shutdown). Installed live on the flashed system
 with `put` + `rc-update add bitra-time boot`; the builder bakes it into new images. A real fix is the PMIC RTC (pm8150 rtc is not enabled in our DT).
 Note: `example.com` does not resolve on the owner's LAN (router DNS); other hosts work. Not a phone issue.
+
+## Update 2026-11-22 (battery/RTC round)
+- /run is now a tmpfs (initramfs), modules are in the image, bitra-time uses the RTC offset: see docs/26.
+- Boot image now `a-7.img` (cmdline `bitra.root=userdata ...`), kernel `7.2.0-g593dc521516f-dirty` + DT with the gauge; the flashed rootfs got modules and the new services live (not reflashed).

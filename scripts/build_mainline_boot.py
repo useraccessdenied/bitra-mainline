@@ -37,6 +37,7 @@ while true; do
     if mount -t ext4 -o rw,noatime "$DEV" /newroot; then
       # telnetd/udhcpd of the initramfs keep running (their shell is the new root's /bin/sh): a way in even if bitra-net fails
       mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore
+      mkdir -p /newroot/run; mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /newroot/run   # /run must be volatile: openrc state otherwise survives reboots
       for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done
       exec switch_root /newroot /sbin/init
     fi

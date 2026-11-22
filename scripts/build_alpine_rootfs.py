@@ -184,22 +184,34 @@ stop() {
 """
 
 BITRA_TIME = """#!/sbin/openrc-run
-description="no RTC on this phone: restore the last known time (TLS needs a sane clock), then sync with NTP when a network is up"
-depend() { need localmount; before bitra-wifi sshd; }
+description="PMIC RTC is read-only (as on Android): keep an offset RTC->real time; no RTC: last saved time; NTP corrects either"
+depend() { need localmount hwclock; before bitra-wifi sshd; }   # hwclock (pulled in by other services) does hctosys from the RTC: must run first
+RTC=/sys/class/rtc/rtc0/since_epoch
+OFF=/var/lib/bitra-rtc-offset
+save() {
+    mkdir -p /var/lib
+    now=$(date +%s); built=$(cat /etc/bitra-build-time 2>/dev/null || echo 0)
+    [ "$now" -gt "$built" ] || return 0        # never persist a bogus (1970) clock
+    echo "$now" > /var/lib/bitra-time
+    [ -r $RTC ] && echo $((now - $(cat $RTC))) > $OFF
+}
 start() {
     now=$(date +%s)
-    saved=$(cat /var/lib/bitra-time 2>/dev/null || echo 0)
     built=$(cat /etc/bitra-build-time 2>/dev/null || echo 0)
-    best=$saved; [ "$built" -gt "$best" ] && best=$built
-    [ "$now" -lt "$best" ] && date -s "@$best" >/dev/null
+    if [ -r $RTC ] && [ -s $OFF ]; then
+        want=$(( $(cat $RTC) + $(cat $OFF) ))
+    else
+        want=$(cat /var/lib/bitra-time 2>/dev/null || echo 0)
+    fi
+    [ "$want" -lt "$built" ] && want=$built
+    logger -t bitra-time "boot: now=$now want=$want built=$built rtc=$(cat $RTC 2>&1) off=$(cat $OFF 2>&1)"
+    if [ "$now" -lt "$want" ] || [ "$now" -gt $((want + 86400)) ]; then date -s "@$want" >/dev/null; logger -t bitra-time "clock set to $(date)"; fi
     # plain background job (not start-stop-daemon): it exits when the time is synced, which openrc would report as 'crashed'
-    setsid sh -c 'until ntpd -q -n -p pool.ntp.org -p time.cloudflare.com >/dev/null 2>&1; do sleep 10; done; mkdir -p /var/lib; date +%s > /var/lib/bitra-time' >/dev/null 2>&1 &
+    setsid sh -c 'until ntpd -q -n -p pool.ntp.org -p time.cloudflare.com >/dev/null 2>&1; do sleep 10; done; /etc/init.d/bitra-time save' >/dev/null 2>&1 &
     return 0
 }
-stop() {
-    mkdir -p /var/lib; date +%s > /var/lib/bitra-time
-    return 0
-}
+stop() { save; return 0; }
+extra_commands="save"
 """
 
 FSTAB = "# <fs> <mountpoint> <type> <opts> <dump> <pass>\nLABEL=bitra-root / ext4 rw,noatime 0 1\n"
@@ -211,6 +223,21 @@ tty1::respawn:/sbin/getty 38400 tty1
 ::shutdown:/sbin/openrc shutdown
 """
 SSHD_CONF = "PermitRootLogin yes\nPasswordAuthentication yes\n"
+
+
+def install_modules(root):
+    """kernel modules of the current build (MAINLINE_OUT) into the image: stripped, depmod'ed by the kernel's modules_install"""
+    if not (OUT / "modules.builtin").exists():
+        print("no modules in", OUT, "- skipping")
+        return
+    env = dict(os.environ, PATH=f"{CLANG.parent}:{os.environ['PATH']}", ARCH="arm64", LLVM="1")
+    subprocess.run(["make", "-C", str(LINUX), f"O={OUT}", f"INSTALL_MOD_PATH={root}", "INSTALL_MOD_STRIP=1", "modules_install"],
+                   check=True, env=env, stdout=subprocess.DEVNULL)
+    for d in (root / "lib/modules").iterdir():
+        for link in ("build", "source"):
+            if (d / link).is_symlink():
+                (d / link).unlink()
+        print("modules:", d.name, subprocess.run(["du", "-sh", str(d)], capture_output=True, text=True).stdout.split()[0])
 
 
 def sh(*cmd, **kw):
@@ -235,6 +262,7 @@ def inner(a):
         p.write_text(data) if isinstance(data, str) else p.write_bytes(data)
         p.chmod(mode)
 
+    install_modules(root)
     put("etc/hostname", "bitra\n")
     put("etc/fstab", FSTAB)
     put("etc/inittab", INITTAB)
@@ -272,7 +300,7 @@ def inner(a):
     def chroot(*cmd, inp=None):
         return subprocess.run(["chroot", str(root), *cmd], check=True, input=inp)
 
-    for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("mdev", "sysinit"),
+    for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("mdev", "sysinit"), ("hwdrivers", "sysinit"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
                      ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-wifi", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
