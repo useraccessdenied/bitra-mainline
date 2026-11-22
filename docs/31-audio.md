@@ -26,6 +26,13 @@ Files in `rootfs-overlay/` (installed by `scripts/build_alpine_rootfs.py`, which
 - Result: card `alsa_card.platform-sound`, default sink `alsa_output.platform-sound.HiFi__Speaker__sink`; `pactl set-sink-volume @DEFAULT_SINK@ 40%` then `paplay tone.wav` plays with no kernel errors or reset (this also did not reproduce the earlier unexplained reset). `alsaucm` state does not persist across invocations, so check enable/disable within one invocation.
 - Not in the profile: microphones, earpiece, headset/USB-C (wiring unverified).
 
+## Microphones (2026-11-22): investigated, not working yet
+- **Stock wiring** (from the stock odm `mixer_paths.xml` and the stock dtbo audio-routing): the handset mics are **analog on the WCD938x**, not DMICs: `ADC1` (IN1, `TX SMIC MUX ADC0`) and `ADC4` (INP5, `TX SMIC MUX ADC3`), read as a stereo pair over `TX_CODEC_DMA_TX_3` (`handset-dmic-endfire`: DEC0<-ADC0, DEC1<-ADC3, `ADC1/ADC4 Volume` 6-8, `TX_DEC0/1 Volume` 84). Headset mic: ADC2 INP2 (`TX_CDC_DMA_TX_4`). The `dmic*` stock paths are for another codec (SLIM) and do not apply.
+- Stock bias routing: AMIC1->MIC BIAS1, AMIC2->BIAS2, AMIC3 and AMIC4->BIAS3, AMIC5->BIAS4. Our DT had only AMIC2; the missing routes are added in the bitra DT (booted as a-24, card still registers).
+- VA-macro DMIC0-3 (`VA_CODEC_DMA_TX_0`): DAPM path fully powered (DMIC2, MIC BIAS1, DEC0, codec DMA all On, pins muxed) but the data is exact zero: no digital mic on those lines.
+- Analog probe (`tools/mic-probe.py adc`, then the stock-style stereo setup): the path delivers data, but nothing yet responds to speech. Every capture starts with the same deterministic ~0.3 s start-up burst (peak 1774, identical across runs; do not mistake it for sound; skip the first 0.5 s). Stock-style stereo: ch0 rms ~5600 both quiet and during speech, ch1 ~2. ADC1 alone: rms 42 quiet vs 47 talking.
+- Next: confirm the test was done with someone talking at the mic holes, then check the capture-side supplies/clocks (MIC BIAS regulator voltage, the `vdd-mic-bias`/BOB supply, `ADC` HW mode, `TX0 MODE` vs stock) and whether the stock firmware needs a different SoundWire TX port setup.
+
 ## Test procedure (manual, without PulseAudio)
 `apk add alsa-utils`; stop PulseAudio (`pkill pulseaudio`: it grabs the card and fails with "Failed to find a working profile"); route and play:
 `amixer -c 0 cset name="TERT_MI2S_RX Audio Mixer MultiMedia1" 1; aplay -D hw:0,0 tone.wav` (`tools/tone.py AMP` writes a 2 s 440 Hz stereo tone; start at amplitude 3000). The speaker amps (2x TFA9874 at 0x34/0x35 on i2c15, "top_spkr/bottom_spkr", Tertiary MI2S RX) have no mixer controls.
