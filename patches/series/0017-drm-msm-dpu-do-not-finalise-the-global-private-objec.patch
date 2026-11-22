@@ -1,7 +1,7 @@
 From 7d8925a6ca2bcf7482dd3e52a8517ffeb9426649 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 12:43:50 +0530
-Subject: [PATCH 17/30] drm/msm/dpu: do not finalise the global private object
+Subject: [PATCH 17/31] drm/msm/dpu: do not finalise the global private object
  twice
 
 dpu_kms_destroy() calls drm_atomic_private_obj_fini() unconditionally. struct dpu_kms survives unbind/bind, so a failed

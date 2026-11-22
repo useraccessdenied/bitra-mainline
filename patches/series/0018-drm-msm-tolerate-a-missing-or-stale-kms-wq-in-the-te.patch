@@ -1,7 +1,7 @@
 From 136edf1505bb7221b7070979f3f755086eba4680 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 14:25:25 +0530
-Subject: [PATCH 18/30] drm/msm: tolerate a missing or stale kms->wq in the
+Subject: [PATCH 18/31] drm/msm: tolerate a missing or stale kms->wq in the
  teardown path
 
 msm_kms_init() allocates kms->wq; msm_kms_destroy() freed it without clearing the pointer, and struct msm_kms survives

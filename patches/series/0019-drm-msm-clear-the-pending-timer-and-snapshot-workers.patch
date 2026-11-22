@@ -1,7 +1,7 @@
 From 6e08a12ede010c7706b4f0fdbdf3c1d01e6ed649 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 16:43:25 +0530
-Subject: [PATCH 19/30] drm/msm: clear the pending-timer and snapshot workers
+Subject: [PATCH 19/31] drm/msm: clear the pending-timer and snapshot workers
  on teardown, test the snapshot worker for NULL
 
 Same lifetime class as the event_thread and kms->wq fixes: struct msm_kms survives unbind/bind, so a failed next bring-up

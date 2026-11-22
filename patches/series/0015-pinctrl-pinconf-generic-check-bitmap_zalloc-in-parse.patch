@@ -1,7 +1,7 @@
 From 6e291167c956bce71dfd3a2671b61218385edc9d Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 10:14:02 +0530
-Subject: [PATCH 15/30] pinctrl: pinconf-generic: check bitmap_zalloc() in
+Subject: [PATCH 15/31] pinctrl: pinconf-generic: check bitmap_zalloc() in
  parse_fw_cfg()
 
 parse_fw_cfg() passes the result of bitmap_zalloc() to test_and_set_bit()

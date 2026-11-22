@@ -1,7 +1,7 @@
 From c4b257f83f3b53476d9d0d1a9ae0983af5401a16 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:39:57 +0530
-Subject: [PATCH 06/30] bitra DTS: temporary local-bd-address for the QCA6390
+Subject: [PATCH 06/31] bitra DTS: temporary local-bd-address for the QCA6390
  Bluetooth controller
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
