@@ -1,0 +1,27 @@
+From cbd6be89f670e6528945c57d83d17a5ed8110be1 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 17:40:58 +0530
+Subject: [PATCH 26/26] drm/msm: print the error code when the GPU cooling
+ device cannot be registered
+
+Without CONFIG_DEVFREQ_THERMAL of_devfreq_cooling_register() is a stub returning -EINVAL, which the
+message hid: say what failed.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/msm_gpu_devfreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_gpu_devfreq.c b/drivers/gpu/drm/msm/msm_gpu_devfreq.c
+index 2e1d5c343..7d1d2d905 100644
+--- a/drivers/gpu/drm/msm/msm_gpu_devfreq.c
++++ b/drivers/gpu/drm/msm/msm_gpu_devfreq.c
+@@ -192,7 +192,7 @@ void msm_devfreq_init(struct msm_gpu *gpu)
+ 	gpu->cooling = of_devfreq_cooling_register(gpu->pdev->dev.of_node, df->devfreq);
+ 	if (IS_ERR(gpu->cooling)) {
+ 		DRM_DEV_ERROR(&gpu->pdev->dev,
+-				"Couldn't register GPU cooling device\n");
++				"Couldn't register GPU cooling device (%pe)\n", gpu->cooling);
+ 		gpu->cooling = NULL;
+ 	}
+ 

@@ -23,11 +23,18 @@ Sway on the `msm` KMS driver with `WLR_RENDERER=pixman`: owner confirmed on the 
   Sway with `WLR_RENDERER=gles2` (compositor on the GPU) + `weston-simple-egl`: **605 frames / 5 s = ~121 fps (the panel's 120 Hz)**; screenshot `docs/data/gpu-egl-screenshot-2026-11-22.png`.
   GPU devfreq 305 -> **670 MHz** (the Snapdragon 870 bin) and back to idle; no GPU errors in dmesg; **GPU survives s2idle suspend/resume** (20 s suspend with the demo running, demo kept running).
 
-## Not done / open
-- **GPU cooling device**: `msm_devfreq_init: Couldn't register GPU cooling device` (error from `of_devfreq_cooling_register`, although the gpu node has `#cooling-cells` and the `gpu-top/bottom-thermal` zones reference it):
-  no kernel GPU throttling path. Fix before the GPU is part of the default boot / heavy use (thermal zones read 36-37 C at idle).
-- **GPU firmware is not in the initramfs**: the first firmware request happens before the root is mounted (`Direct firmware load for qcom/a650_sqe.fw failed with error -2` at ~25 s); the later retry after `switch_root` works (~85 s on first GPU use). Add `a650_sqe.fw.zst`, `a650_gmu.bin.zst` and the ZAP files to the initramfs.
-- `sync_state() pending due to 3d6a000.gmu` for gcc/gpucc until the GPU initialises (check that it completes; it did not matter for function).
-- The flashed boot image has the GPU disabled; flash an image built from the new DT after the two items above (use `tools/flash-boot.sh`).
-- No Xwayland (not installed), no on-screen keyboard, no screen lock/idle, no brightness/rotation handling, no auto-start (sway is started by hand), no D-Bus session. The base for a real shell is Phosh (docs/27 next steps).
-- The image builder (`scripts/build_alpine_rootfs.py`) now includes all of the above (packages, udev, user, overlay, ZAP firmware); the default size is 1280 MB (a 1 GiB+ image does not fit a single agent `put`: keep using the live system or split transfers).
+## Fixed after the first proof (2026-11-22, same day)
+- **GPU cooling device**: the cause was `# CONFIG_DEVFREQ_THERMAL is not set`: without it `of_devfreq_cooling_register()` is a header stub that returns `-EINVAL`, and the msm message hid the code (now printed with `%pe`, kernel `cbd6be89f`).
+  Enabled `CONFIG_DEVFREQ_THERMAL=y` (in `configs/bitra_defconfig`). Verified: `cooling_device3` = `devfreq-3d00000.gpu` (7 states) bound as `cdev0` to `gpu-top-thermal` and `gpu-bottom-thermal`;
+  forcing `cur_state` 6 caps the devfreq `max_freq` at 305 MHz, state 0 restores 670 MHz (the demo keeps its ~121 fps). Modules had to be rebuilt/reinstalled together with the kernel.
+  (A debugging detour: I patched `devfreq_cooling.c` with traces that never ran because that file was not even compiled; check `CONFIG_*` before instrumenting.)
+- **GPU firmware in the initramfs**: `a650_sqe.fw.zst`, `a650_gmu.bin.zst` (linux-firmware, copied from Alpine's `linux-firmware-qcom` into `third_party/firmware/qcom/`) and the device-specific ZAP files are now in the boot image
+  (`EXTRA_FW` in `scripts/build_mainline_boot.py`); the GPU loads its firmware at ~25 s with no failed first attempt.
+- **Flashed**: `releases/mainline-boot-3.img` (= `a-17`: kernel `7.2.0-bitra` + GPU enabled + DEVFREQ_THERMAL + GPU firmware in the initramfs + early pstore copy), sha256 `507beb960a6415f01a3f8efb084ccc1308fa1e8419e9b0e0b5099d8131c6b87b`, written with `tools/flash-boot.sh` after confirming the partition held `mainline-boot-2`;
+  readback OK; a normal reboot came up on its own with Turnip Adreno 650, EGL FD650, cooling and firmware all working. Rollback images: `mainline-boot-2`, `mainline-boot-1`, and the Droidian backup.
+
+## Still open
+- `sync_state() pending due to 3d6a000.gmu` (gcc/gpucc) persists (the GMU device has no bound driver of its own); functionally harmless so far.
+- No long-run GPU stress or GPU-hang recovery test; no GPU load vs thermals measurement.
+- No Xwayland, on-screen keyboard, screen lock/idle, brightness/rotation handling, auto-start of sway, D-Bus session. A real shell (Phosh) is the next step.
+- The image builder (`scripts/build_alpine_rootfs.py`) includes the graphics stack, user, overlay and ZAP firmware; a full image is ~1.3 GB (does not fit one agent `put`; the live system is the source of truth).

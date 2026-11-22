@@ -121,13 +121,27 @@ import lzma
 FW_ROOT = Path(os.environ.get("FIRMWARE_DIR", "/usr/lib/firmware"))
 FW_FILES = ["regulatory.db", "regulatory.db.p7s", "ath11k/QCA6390/hw2.0/amss.bin", "ath11k/QCA6390/hw2.0/m3.bin", "ath11k/QCA6390/hw2.0/board-2.bin",
             "qca/htbtfw20.tlv", "qca/htnv20.bin"]
+# GPU firmware must already be in the initramfs: the adreno driver asks for it at ~25 s, before the root is mounted (otherwise the first request fails).
+# a650_sqe.fw / a650_gmu.bin: linux-firmware (zstd-compressed, as shipped by Alpine's linux-firmware-qcom); the stock Android SQE (v93) is too old.
+# The signed ZAP shader is device specific: this phone's stock vendor firmware.
+STOCK_FW = BITRA / "firmware/stock-a13/v-extract/vendor/firmware"
+EXTRA_FW = [("qcom/a650_sqe.fw.zst", ROOT / "third_party/firmware/qcom/a650_sqe.fw.zst"),
+            ("qcom/a650_gmu.bin.zst", ROOT / "third_party/firmware/qcom/a650_gmu.bin.zst")] + \
+           [("qcom/sm8250/realme/bitra/" + n, STOCK_FW / n) for n in ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02")]
 def firmware_entries():
     import stat as _st
     D, F = _st.S_IFDIR | 0o755, _st.S_IFREG | 0o644
-    ents, dirs = [], set()
+    files = []
     for rel in FW_FILES:
         src = FW_ROOT / (rel + ".xz")
-        data = lzma.open(src).read() if src.exists() else (FW_ROOT / rel).read_bytes()
+        files.append((rel, lzma.open(src).read() if src.exists() else (FW_ROOT / rel).read_bytes()))
+    for rel, src in EXTRA_FW:
+        if src.exists():
+            files.append((rel, src.read_bytes()))
+        else:
+            print("WARNING: missing GPU firmware", src, file=sys.stderr)
+    ents, dirs = [], set()
+    for rel, data in files:
         parts = ("lib/firmware/" + rel).split("/")
         for i in range(1, len(parts)):
             d = "/".join(parts[:i])

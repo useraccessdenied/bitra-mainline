@@ -1,7 +1,7 @@
 From bead68980030a78a51dd83414d17c17613d12099 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 17:21:07 +0530
-Subject: [PATCH 25/25] arm64: dts: qcom: sm8250-realme-bitra: enable the
+Subject: [PATCH 25/26] arm64: dts: qcom: sm8250-realme-bitra: enable the
  Adreno 650 GPU and GMU, ZAP shader from the stock vendor firmware
 
 Verified 2026-11-22: turnip (Vulkan 1.3) and freedreno (OpenGL ES, FD650), sway on the gles2 renderer and

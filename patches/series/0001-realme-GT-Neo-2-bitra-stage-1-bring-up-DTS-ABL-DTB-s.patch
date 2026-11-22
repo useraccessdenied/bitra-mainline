@@ -1,7 +1,7 @@
 From 9a616e34e143e69a5855c9926f1ca180ff4353d7 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 00:52:56 +0530
-Subject: [PATCH 01/25] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
+Subject: [PATCH 01/26] realme GT Neo 2 (bitra): stage-1 bring-up DTS, ABL DTB
  shim, permanent efifb console
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

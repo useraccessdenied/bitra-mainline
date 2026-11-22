@@ -52,3 +52,6 @@ Development flow now: build a test image, RAM-boot it (`ssh mac to-fastboot` fro
 Same kernel (`7.2.0-bitra`) and cmdline as `mainline-boot-1`, plus an initramfs change: right after mounting the root, `/pstore` is copied to `/var/lib/pstore/early-<uptime>/` (the previous boot's ramoops console/dmesg survive even if the next boot dies before userspace).
 sha256 `8ecc47d16a773eb0980e7a16586071674d0674cc382413877da0071a459ae643`, flashed with `tools/flash-boot.sh` after confirming the partition held `mainline-boot-1` (hash `22dc32fb...`); readback OK; normal reboot came up in Alpine on its own and the early copy ran.
 Rollback images: `releases/mainline-boot-1.img` (previous), `bitra/backups/boot-before-mainline-20261122/` (Droidian).
+
+### Update 2026-11-22 (GPU): `mainline-boot-3.img` flashed
+GPU enabled in the DT, `CONFIG_DEVFREQ_THERMAL=y`, GPU firmware in the initramfs; sha256 `507beb960a6415f01a3f8efb084ccc1308fa1e8419e9b0e0b5099d8131c6b87b`; flashed over `mainline-boot-2` with `tools/flash-boot.sh` (readback OK, standalone boot verified). See docs/29.

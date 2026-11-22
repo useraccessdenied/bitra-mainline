@@ -1,7 +1,7 @@
 From 2c670a5497f534788a71b3e5f31eebe262a31e28 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:58:34 +0530
-Subject: [PATCH 08/25] bitra DTS: enable UFS (host + PHY) after the read-only
+Subject: [PATCH 08/26] bitra DTS: enable UFS (host + PHY) after the read-only
  probe verified it
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

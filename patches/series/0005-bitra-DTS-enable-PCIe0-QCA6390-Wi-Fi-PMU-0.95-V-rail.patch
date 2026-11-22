@@ -1,7 +1,7 @@
 From d952ec9a35f02236f7ed785e8ed9b8c0c81618f0 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 02:21:01 +0530
-Subject: [PATCH 05/25] bitra DTS: enable PCIe0 + QCA6390 Wi-Fi, PMU 0.95 V
+Subject: [PATCH 05/26] bitra DTS: enable PCIe0 + QCA6390 Wi-Fi, PMU 0.95 V
  rails from pm8150 s6 (smpf2 has no RPMh address here)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
