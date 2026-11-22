@@ -329,7 +329,7 @@ def inner(a):
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("elogind", "default"), ("polkit", "default"), ("tinydm", "default"), ("networkmanager", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
-                     ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"),
+                     ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
@@ -345,7 +345,7 @@ def inner(a):
     for src in sorted(overlay.rglob("*")):
         if src.is_file():
             rel = str(src.relative_to(overlay))
-            put(rel, src.read_bytes(), 0o755 if rel.startswith("usr/local/bin/") else 0o644)
+            put(rel, src.read_bytes(), 0o755 if rel.startswith(("usr/local/bin/", "etc/init.d/")) else 0o644)
     chroot("/bin/chown", "-R", "1000:1000", "/home/bitra")
     # Phosh: tinydm autologin (uid 1000 = bitra) starts the phosh session; NetworkManager must not touch the USB gadget link
     put("var/lib/tinydm/default-session.desktop", "", 0o644)
@@ -369,6 +369,18 @@ def inner(a):
     if (stock / "v-extract/vendor/etc/sensors/sns_reg_config").exists():
         put(f"{qroot}/sensors/sns_reg.conf", (stock / "v-extract/vendor/etc/sensors/sns_reg_config").read_bytes())
     (root / qroot / "sensors/registry/registry").mkdir(parents=True, exist_ok=True)
+    # platform identity the SSC config selection reads from /sys/devices/soc0 (mainline's socinfo lacks hw_platform & co.); hw_platform MTP + soc_id 356 match the IMU/hall/SAR configs
+    for name, val in (("hw_platform", "MTP"), ("platform_subtype", "Unknown"), ("platform_subtype_id", "0"), ("platform_version", "65536"),
+                      ("soc_id", "356"), ("revision", "2.1")):
+        put(f"{qroot}/socinfo/{name}", val + "\n")
+    # the stock sensor registry (tools/extract-sensor-registry.py from the owner's persist backup; device specific, gitignored): without it SSC enumerates no sensors
+    reg = ROOT / "third_party/sensors/registry"
+    if reg.is_dir():
+        for f in sorted((reg / "registry").iterdir()):
+            put(f"{qroot}/sensors/registry/registry/{f.name}", f.read_bytes())
+        put(f"{qroot}/sensors/registry/sns_reg_version", (reg / "sns_reg_version").read_bytes())
+    else:
+        print("WARNING: third_party/sensors/registry missing: run tools/extract-sensor-registry.py, otherwise no sensor is enumerated (docs/32)")
     put("etc/conf.d/hexagonrpcd-sdsp", 'hexagonrpcd_fw_dir="/' + qroot + '"\n')
     (root / "odm/etc/sensor").mkdir(parents=True, exist_ok=True)       # the DSP opens /odm/etc/sensor/config literally
     if not (root / "odm/etc/sensor/config").is_symlink():

@@ -1,0 +1,7 @@
+# realme GT Neo 2: the sensors sit behind the SLPI (Qualcomm Sensor Core via libssc, docs/32). The stock iio-sensor-proxy rule only enables
+# ssc-light and ssc-compass on the SDSP; add the accelerometer (auto-rotate) and the proximity sensor.
+SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity"
+
+# Accelerometer mount matrix (docs/32, measured with a flat / portrait / landscape pose test): the SSC reports X correctly but Y and Z inverted
+# relative to the usual convention (X right, Y up the screen, Z out of the screen).
+SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp*", ENV{ACCEL_MOUNT_MATRIX}="1, 0, 0; 0, -1, 0; 0, 0, -1"

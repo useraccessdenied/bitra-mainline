@@ -1,0 +1,27 @@
+#!/sbin/openrc-run
+# The sensor DSP needs ~100 s after hexagonrpcd attaches before the Sensor Core answers, and iio-sensor-proxy exits at once when it finds no
+# sensor. Wait in the background until an SSC sensor answers, then (re)start the proxy so Phosh gets auto-rotate (docs/32).
+description="Start iio-sensor-proxy once the SLPI sensors answer"
+
+depend() {
+	need hexagonrpcd-sdsp dbus
+	after udev
+}
+
+start() {
+	ebegin "Waiting for the SLPI sensors (background)"
+	(
+		for i in 1 2 3 4 5 6 7 8; do
+			if timeout 40 ssccli --sensor accelerometer --timeout 3 2>&1 | grep -q measurement; then
+				rc-service iio-sensor-proxy restart >/dev/null 2>&1
+				exit 0
+			fi
+		done
+	) >/dev/null 2>&1 &
+	eend 0
+}
+
+stop() {
+	rc-service iio-sensor-proxy stop >/dev/null 2>&1
+	return 0
+}
