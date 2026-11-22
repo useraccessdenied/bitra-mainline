@@ -1,0 +1,30 @@
+== Sun Nov 22 09:09:53 UTC 2026 spower x2 kernel 7.2.0-bitra cmdline: 
+[   33.268743] gcc-sm8250 100000.clock-controller: sync_state() pending due to 793000.rng
+sync_state pending count: 1
+WAITING for UNPLUG of USB (up to 15 min). ~9 min run: idle 90 s (backlight off), suspend 150 s, suspend 150 s radios off. DO NOT TOUCH.
+unplugged rtc=1446608 st=Discharging v=8400000 i=-11000 q=1193000 cap=81 T=357
+unplug detected, settling 30 s
+I: idle, backlight OFF (90 s)
+I t=10 rtc=1446648 st=Discharging v=8398000 i=-104000 q=1192000 cap=81 T=356
+I t=20 rtc=1446658 st=Discharging v=8394000 i=-104000 q=1192000 cap=81 T=355
+I t=30 rtc=1446668 st=Discharging v=8392000 i=-104000 q=1191000 cap=81 T=355
+I t=40 rtc=1446678 st=Discharging v=8394000 i=-104000 q=1191000 cap=81 T=355
+I t=50 rtc=1446688 st=Discharging v=8392000 i=-103000 q=1191000 cap=81 T=355
+I t=60 rtc=1446698 st=Discharging v=8386000 i=-103000 q=1190000 cap=81 T=355
+I t=70 rtc=1446708 st=Discharging v=8385000 i=-103000 q=1190000 cap=81 T=354
+I t=80 rtc=1446718 st=Discharging v=8387000 i=-103000 q=1190000 cap=81 T=354
+I t=90 rtc=1446728 st=Discharging v=8383000 i=-103000 q=1189000 cap=81 T=354
+S1: SUSPEND 150s, Wi-Fi + Bluetooth up (screen dark, do not touch)
+S1 before rtc=1446728 st=Discharging v=8383000 i=-103000 q=1189000 cap=81 T=354
+S1 after+0s rtc=1446880 st=Discharging v=8352000 i=-66000 q=1186000 cap=81 T=349
+S1 after+1s rtc=1446881 st=Discharging v=8333000 i=-158000 q=1186000 cap=81 T=349
+S1 after+3s rtc=1446883 st=Discharging v=8339000 i=-162000 q=1186000 cap=81 T=349
+radios off
+S2: SUSPEND 150s, radios OFF (screen dark, do not touch)
+S2 before rtc=1446904 st=Discharging v=8375000 i=-119000 q=1185000 cap=81 T=349
+S2 after+0s rtc=1447056 st=Discharging v=8352000 i=-64000 q=1182000 cap=80 T=346
+S2 after+1s rtc=1447057 st=Discharging v=8321000 i=-69000 q=1182000 cap=80 T=346
+S2 after+3s rtc=1447059 st=Discharging v=8324000 i=-93000 q=1182000 cap=80 T=346
+RESULT x2: idle(bl off) -103000 uA | suspend radios-up -66000 uA | suspend radios-off -64000 uA
+ALL DONE - replug USB now
+== done

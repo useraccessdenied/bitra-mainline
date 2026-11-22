@@ -38,9 +38,9 @@ Needs: a Linux build host with an aarch64-capable clang (the AOSP `clang-r563880
 `MAINLINE_SRC` (kernel tree), `MAINLINE_OUT` (kernel build dir), `FIRMWARE_DIR` (linux-firmware, default `/usr/lib/firmware`).
 
 1. **Kernel** (in the kernel fork, branch `bitra`): `cp configs/bitra_defconfig arch/arm64/configs/`, then `make O=../out ARCH=arm64 LLVM=1 bitra_defconfig` and
-   `make O=../out ARCH=arm64 LLVM=1 -j$(nproc) Image.gz modules dtbs` (a DT change needs `dtbs` as well as `Image.gz`).
+   `make O=../out ARCH=arm64 LLVM=1 LOCALVERSION= -j$(nproc) Image.gz modules dtbs` (a DT change needs `dtbs` as well as `Image.gz`; `LOCALVERSION=` keeps the release `7.2.0-bitra` so modules match across builds).
 2. **Rootfs**: `python3 scripts/build_alpine_rootfs.py --size-mb 600` -> `releases/alpine-rootfs.ext4` (+ `.sha256`). Installs the kernel modules of `MAINLINE_OUT`.
-3. **Boot image**: `python3 scripts/build_mainline_boot.py a-N --cmdline-extra "bitra.root=userdata clk_ignore_unused pd_ignore_unused panic=0 consoleblank=0 earlycon=efifb keep_bootcon console=tty0 loglevel=4"`
+3. **Boot image**: `python3 scripts/build_mainline_boot.py a-N --cmdline-extra "bitra.root=userdata panic=0 consoleblank=0 earlycon=efifb keep_bootcon console=tty0 loglevel=4"`
    (put important parameters first: the boot image truncates the kernel command line).
 4. **Boot**: `ssh mac "stage --sha256 H a-N.img" < releases/a-N.img`, `ssh mac to-fastboot`, `ssh mac "ramboot a-N.img"`. (A fastboot entered with the hardware keys makes the OPLUS ABL refuse images; `to-fastboot` from a running OS works, also from Alpine.)
 5. **Install the rootfs** (first time only; wipes `userdata`): see [docs/25-alpine-rootfs.md](docs/25-alpine-rootfs.md) (tmpfs in RAM, `put`, `sha256sum`, `dd`, read back and compare).

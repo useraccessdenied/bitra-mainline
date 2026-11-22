@@ -1,0 +1,29 @@
+== Sun Nov 22 08:58:26 UTC 2026 spower x1 kernel 7.2.0-bitra cmdline: clk_ignore_unused pd_ignore_unused 
+sync_state pending count: 0
+WAITING for UNPLUG of USB (up to 15 min). ~9 min run: idle 90 s (backlight off), suspend 150 s, suspend 150 s radios off. DO NOT TOUCH.
+unplugged rtc=1445921 st=Discharging v=8423000 i=-3000 q=1192000 cap=81 T=365
+unplug detected, settling 30 s
+I: idle, backlight OFF (90 s)
+I t=10 rtc=1445961 st=Discharging v=8411000 i=-103000 q=1191000 cap=81 T=363
+I t=20 rtc=1445971 st=Discharging v=8408000 i=-104000 q=1190000 cap=81 T=362
+I t=30 rtc=1445981 st=Discharging v=8409000 i=-104000 q=1190000 cap=81 T=362
+I t=40 rtc=1445991 st=Discharging v=8405000 i=-105000 q=1190000 cap=81 T=361
+I t=50 rtc=1446001 st=Discharging v=8402000 i=-104000 q=1189000 cap=81 T=361
+I t=60 rtc=1446011 st=Discharging v=8400000 i=-104000 q=1189000 cap=81 T=361
+I t=70 rtc=1446021 st=Discharging v=8397000 i=-104000 q=1189000 cap=81 T=360
+I t=80 rtc=1446031 st=Discharging v=8397000 i=-104000 q=1188000 cap=81 T=360
+I t=90 rtc=1446041 st=Discharging v=8395000 i=-104000 q=1188000 cap=81 T=359
+S1: SUSPEND 150s, Wi-Fi + Bluetooth up (screen dark, do not touch)
+S1 before rtc=1446041 st=Discharging v=8395000 i=-104000 q=1188000 cap=81 T=359
+S1 after+0s rtc=1446193 st=Discharging v=8360000 i=-66000 q=1185000 cap=81 T=352
+S1 after+1s rtc=1446194 st=Discharging v=8341000 i=-155000 q=1185000 cap=81 T=352
+S1 after+3s rtc=1446196 st=Discharging v=8347000 i=-160000 q=1184000 cap=81 T=352
+radios off
+S2: SUSPEND 150s, radios OFF (screen dark, do not touch)
+S2 before rtc=1446217 st=Discharging v=8381000 i=-120000 q=1184000 cap=80 T=352
+S2 after+0s rtc=1446369 st=Discharging v=8359000 i=-63000 q=1180000 cap=80 T=348
+S2 after+1s rtc=1446370 st=Discharging v=8327000 i=-78000 q=1180000 cap=80 T=347
+S2 after+3s rtc=1446372 st=Discharging v=8332000 i=-92000 q=1180000 cap=80 T=347
+RESULT x1: idle(bl off) -104000 uA | suspend radios-up -66000 uA | suspend radios-off -63000 uA
+ALL DONE - replug USB now
+== done

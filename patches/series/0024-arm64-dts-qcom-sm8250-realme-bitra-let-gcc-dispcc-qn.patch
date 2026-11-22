@@ -1,0 +1,42 @@
+From 2ee4f4f424fd78081cb2037cdeccc944b9fec3d2 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 14:23:52 +0530
+Subject: [PATCH 24/24] arm64: dts: qcom: sm8250-realme-bitra: let
+ gcc/dispcc/qnoc reach sync_state (drop framebuffer-0 clocks/pd, disable
+ unused crypto)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 6a8429556..29fb990dc 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -38,7 +38,13 @@ chosen {
+ 	};
+ };
+ 
++/*
++ * No driver binds the bootloader framebuffer node (simplefb/simpledrm are off; msm owns the real display clocks), so its clocks and
++ * power domain kept gcc/dispcc from ever reaching sync_state (bootloader votes never released). Keep only the geometry for the efifb console.
++ */
+ &framebuffer {
++	/delete-property/ clocks;
++	/delete-property/ power-domains;
+ 	width = <1080>;
+ 	height = <2400>;
+ 	stride = <(1080 * 4)>;
+@@ -143,3 +149,11 @@ fuel_gauge: fuel-gauge@55 {
+ 		reg = <0x55>;
+ 	};
+ };
++
++/*
++ * The QCE crypto engine has no driver in our config, and its interconnect vote kept qnoc 163d000/1700000 from reaching sync_state
++ * (the bootloader's bus bandwidth votes were never released: standby power). Not used, so disable it.
++ */
++&crypto {
++	status = "disabled";
++};

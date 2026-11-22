@@ -1,7 +1,7 @@
 From 50c10c1c47410ac45bacd2c943f385b1e850ca9a Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 04:08:35 +0530
-Subject: [PATCH 14/23] watchdog: qcom: mark an already-armed watchdog as
+Subject: [PATCH 14/24] watchdog: qcom: mark an already-armed watchdog as
  running at probe
 
 When the bootloader leaves the apps watchdog enabled, tell the watchdog core (WDOG_HW_RUNNING) so it keeps petting it until userspace opens the device. Without it a slow boot (e.g. a KASAN/lockdep kernel) is reset by the bootloader's watchdog before init runs.

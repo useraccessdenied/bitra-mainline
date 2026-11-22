@@ -53,3 +53,22 @@ At ~70 mA this pack (1480 mAh) lasts ~21 h in suspend, ~12 h idle with the scree
 
 Next experiments (each needs the phone unplugged for a few minutes; the gauge average settles in ~1 min): boot without `clk_ignore_unused pd_ignore_unused`, bring `hci0` down, turn `mdss` off in suspend, list powered regulators
 (`/sys/kernel/debug/regulator/regulator_summary`), and read `/sys/kernel/debug/clk/clk_summary` for enabled unused clocks.
+
+## Standby power: experiments (2026-11-22, `tools/suspend-power2.sh`, logs `docs/data/spower-x*.log`)
+Short method: 90 s idle with the backlight off, then 150 s suspends; the gauge's average current (time constant ~30 s) read right after wake is dominated by the suspended draw (it matched the 15 min dQ/dt runs within ~10 mA).
+
+| Run | Kernel/cmdline | Idle (backlight off) | Suspend, radios up | Suspend, radios rfkill-blocked |
+|---|---|---|---|---|
+| baseline (earlier, 120 s/15 min stages) | `7.2.0-g2cecd2883092`, ignore flags on | 123 mA | ~70 mA | ~60-69 mA |
+| x1 | + DT: no framebuffer-0 clocks/pd, crypto disabled (`sync_state` pending count 4 -> 0) | **104 mA** | 66 mA | 63 mA |
+| x2 | x1 without `clk_ignore_unused pd_ignore_unused` | 103 mA | 66 mA | 64 mA |
+
+Findings:
+- **The `sync_state` fix is worth ~19 mA when awake** (the bootloader's interconnect/clock votes were never released: `gcc`/`dispcc` waited for `chosen:framebuffer-0`, `qnoc` for `crypto@1dfa000`, neither of which has a driver). It barely changes suspend (-4 mA).
+- **`clk_ignore_unused` / `pd_ignore_unused` are not needed any more and cost nothing to drop**: the phone boots and runs normally without them (display, Wi-Fi, USB shell, modules), and the power is unchanged. They stay off in the recommended command line (docs/25: `a-10`).
+- Radios (Wi-Fi/BT blocked with rfkill) change ~2 mA only. Note rfkill does not power the QCA6390 down: its PMU rails stay on while `pwrseq-qcom_wcn`/ath11k are bound.
+- UFS is already in its deepest suspend state (`spm_lvl` 3: device SLEEP, link HIBERN8). CPU and cluster reach `cpu-sleep-0-0` / `cluster-sleep-0`.
+- **The suspend floor is still ~65 mA at 8.35 V (0.55 W).** Not explained by unused clocks/PDs, UFS, CPUs or the radios' rfkill state. Remaining candidates, to be bisected by unbinding in a cumulative run:
+  QCA6390 PMU rails (unbind pwrseq + ath11k + BT), the audio codec/amps (WCD938x rails `audio-codec-vdd-*` are held by a deferred codec, TFA987x x2, FSA4480), panel supplies in suspend (`ae94000.dsi.0-vdd/vddr/vddio`),
+  the display subsystem (`mdss_gdsc` on), NFC/haptics chips, the PMIC regulators `vreg_bob` (6 users) and `vreg_s*`, DDR/`cx`/`mx` levels in the RPMh sleep set (needs `aoss`/`rpmh` debugging), and battery-side parts (charge pump / VOOC MCU quiescent).
+- Kernel release is pinned to `7.2.0-bitra` (`CONFIG_LOCALVERSION="-bitra"`, no `LOCALVERSION_AUTO`, and `export LOCALVERSION=` in the build environment so the build script does not append `+`): DT-only rebuilds keep matching modules.

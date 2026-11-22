@@ -1,7 +1,7 @@
 From 4dbb0bd0e9f01390d624626d4a0768b6aa90d828 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sat, 21 Nov 2026 03:31:56 +0530
-Subject: [PATCH 11/23] bitra DTS: Synaptics S3908 touchscreen on i2c13 (vdd =
+Subject: [PATCH 11/24] bitra DTS: Synaptics S3908 touchscreen on i2c13 (vdd =
  l11c 3.0 V, avdd = l1c 1.8 V, irq tlmm39, reset tlmm38)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
