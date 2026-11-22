@@ -9,7 +9,7 @@ Status: **Working** = verified on the phone | **Partial** = works with gaps (lis
 ## Platform / boot
 | Item | Status | Evidence / gaps | Next step | Doc |
 |---|---|---|---|---|
-| Boot path | **Partial** | RAM boot only: Droidian initrd -> `to-fastboot` -> `ramboot`. ABL refuses mainline DTBs, so the Droidian base DTB is passed and `BITRA_DTB_SHIM` swaps in ours. Nothing flashed to `boot`. | standalone boot (flash a mainline boot image, keep a recovery path) | 18 |
+| Boot path | **Working** | **Mainline boot image flashed to `boot` (sde11) on 2026-11-22** (`releases/mainline-boot-1.img` = `a-10`, kernel `7.2.0-bitra`, cmdline `bitra.root=userdata`): a normal reboot comes up in Alpine by itself (`androidboot.mode=normal`), no fastboot/Mac step. ABL still needs the Droidian base DTB + kernel DTB shim (it refuses mainline DTBs). Test kernels are still RAM-booted (`fastboot boot`); a crash now reboots into the flashed kernel, not Droidian. Backup of the old `boot` (Droidian): `bitra/backups/boot-before-mainline-20261122/`. Recovery: key-combo fastboot, `fastboot flash boot <backup>` | production boot image build, update procedure (`tools/flash-boot.sh`) | 25 |
 | Reboot / `reboot bootloader` | **Working** | PMIC PON reboot-mode; `to-fastboot` works from initramfs and from Alpine. | | 18 |
 | Power-off | **Untested** | | test `poweroff`/long-press behaviour | |
 | CPU / SMP / cpufreq | **Working** | 8 CPUs, schedutil, cpu7 seen at 1.86 GHz. cpuidle states, big-core max frequency under load: unverified | measure idle states, boost | |
@@ -76,7 +76,7 @@ Status: **Working** = verified on the phone | **Partial** = works with gaps (lis
 | Console on the panel | **Working** | tty1 login, diagnostics block in `/etc/issue` | |
 | Network shells (USB-NCM telnet/ssh, Wi-Fi ssh) | **Working** | agent shell, sshd, Wi-Fi at boot | harden (telnet is root, no password, on 0.0.0.0 by owner choice) |
 | Graphical session (sway/Phosh) + touch | **Not tried** | needs GPU decision (software rendering OK first) | |
-| Standalone boot (no Mac) | **Not working** | see Boot path | |
+| Standalone boot (no Mac) | **Working** | boots Alpine from the flashed `boot` partition (2026-11-22); a USB host is still needed for the agent shell, Wi-Fi/ssh work without it | |
 | Production kernel config | **Partial** | non-debug, modules shipped; still the pmOS-derived superset (548 modules) | trim, `LOCALVERSION`, signed/reproducible build |
 | Hardware keys in UI, rotation, brightness UI | **Not tried** | | |
 | Power management daemon, battery UI | **Not tried** | gauge data exists | |

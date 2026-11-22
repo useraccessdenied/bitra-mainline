@@ -11,8 +11,8 @@ Companion repos
 
 ## Status (2026-11-22)
 Mainline **7.2.0 boots the phone into Alpine Linux 3.24 from UFS (`userdata`)**: console on the panel (fbcon), touchscreen, Wi-Fi, USB-NCM + SSH shells,
-battery gauge, thermal sensing, input devices for the hardware keys. It is still **RAM-booted** (`fastboot boot` of a boot image carrying the kernel + initramfs);
-nothing is flashed to `boot`.
+battery gauge, thermal sensing, input devices for the hardware keys. It boots standalone from the flashed `boot` partition (kernel + initramfs);
+the mainline boot image is **flashed to `boot`** (2026-11-22), so the phone boots Alpine by itself; test kernels are still RAM-booted with `fastboot boot`.
 
 Per-hardware status (working / partial / not working / untested) is tracked in **[docs/27-hardware-status.md](docs/27-hardware-status.md)** — keep it current.
 Biggest gaps: audio, cellular modem, camera, sensors and the GPU (all need the remote processors / firmware work), charging control (fast charge), suspend, standalone boot.
@@ -28,7 +28,7 @@ Biggest gaps: audio, cellular modem, camera, sensors and the GPU (all need the r
 | `scripts/export_patches.py` | Exports the kernel commits to `patches/series/` |
 | `configs/bitra_defconfig` | `savedefconfig` of the working kernel build |
 | `patches/` | The kernel changes as a `git am` series (`patches/series/`, base in `patches/BASE`) |
-| `tools/` | Small freestanding aarch64 helpers (`bitra-reboot`, `bitra-drm`, `bitra-evtest`, `bitra-failnth`), Python hardware tests that run on the phone (`bitra-haptic.py`, `bitra-nfc.py`) and `soak.sh` (display soak / fault-injection harness) |
+| `tools/` | `flash-boot.sh` (hash-checked flash of the `boot` partition from the phone), small freestanding aarch64 helpers (`bitra-reboot`, `bitra-drm`, `bitra-evtest`, `bitra-failnth`), Python hardware tests that run on the phone (`bitra-haptic.py`, `bitra-nfc.py`) and `soak.sh` (display soak / fault-injection harness) |
 | `third_party/` | Fetched/vendored inputs (Alpine packages, touch driver series); mostly gitignored |
 | `releases/`, `build/` | Build outputs (gitignored) |
 
@@ -48,7 +48,7 @@ Needs: a Linux build host with an aarch64-capable clang (the AOSP `clang-r563880
 
 ## Safety rules used here
 - Never write the firmware LUNs (xbl, abl, aop, hyp, modem, persist, ...); only `userdata` is written. Backups of the original partitions live in the `bitra` workspace.
-- The Droidian boot image stays in `boot`: its initrd is the way back to fastboot after a power cycle.
+- The `boot` partition holds the mainline image since 2026-11-22; the old Droidian image is backed up (`bitra/backups/boot-before-mainline-20261122/`, restore with `fastboot flash boot`). The recovery path is the key-combo fastboot (vol-down + power); `fastboot boot` of a test image works from it.
 - Verify every transfer by hash (`stage --sha256`, `sha256sum` on the phone) and every flash by readback.
 - Do not enable charger drivers that write float voltage / current limits until checked against the stock values (docs/26).
 

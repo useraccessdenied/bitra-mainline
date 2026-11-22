@@ -61,3 +61,10 @@ State: kernel fork `bitra` at 593dc5215 (candidates #1-#14 in docs/24); image `r
 - `rpmh.c:386` WARN from `sugov` (cpufreq) seen once on a debug kernel; unexamined.
 - Boot-time `clk_core_disable/unprepare` WARNs (~19 s, kworker) — DSI PHY related (item 1 above).
 - Charger: MP2650 / Oplus charge pump / RK826 VOOC MCU / SMB1390 are not driven; charging works by hardware default, fast charging does not (docs/26).
+
+## Standby power bisect: suspend hang after unbinding the Wi-Fi/BT power chain (2026-11-22)
+`tools/suspend-power3.sh` (cumulative unbind run): stage B0 (baseline, nothing unbound) measured 65 mA suspended. Stage B1 unbound `ath11k_pci` (0000:01:00.0), `hci_uart_qca` (serial0-0), `pci-pwrctrl-pwrseq`
+(1c00000.pcie:pcie@0:wifi@0) and `pwrseq-qcom_wcn` (qca6390-pmu) -- all four reported unbound, regulators in use dropped 53 -> 47 -- and then the s2idle suspend never returned: the phone was reset (watchdog) and booted into the old Droidian initrd.
+Unknown whether it hung entering suspend (PCIe root port 0000:00:00.0 left without its endpoint/power sequencer, `1c00000.pcie` runtime state) or in resume. Not caused by the radios being "off" (rfkill suspends fine).
+Next: redo the bisect on the flashed kernel (a hang now reboots into Alpine), unbind in smaller steps (BT alone, then ath11k alone, then pwrseq), keep a console log (`no_console_suspend`, ramoops `console-ramoops` after the reset).
+Also: the boot partition used to hold Droidian; it now holds the mainline image (docs/25).

@@ -38,3 +38,12 @@ Note: `example.com` does not resolve on the owner's LAN (router DNS); other host
 ## Update 2026-11-22 (battery/RTC round)
 - /run is now a tmpfs (initramfs), modules are in the image, bitra-time uses the RTC offset: see docs/26.
 - Boot image now `a-7.img` (cmdline `bitra.root=userdata ...`), kernel `7.2.0-g593dc521516f-dirty` + DT with the gauge; the flashed rootfs got modules and the new services live (not reflashed).
+
+## Boot image flashed to `boot` (2026-11-22)
+After a hang during the standby-power experiments reset the phone into the Droidian initrd (no Droidian rootfs any more: bootloop-like, shell windows only a few seconds), the mainline boot image was flashed permanently:
+1. Backup of the partition first: `dd if=/dev/sde11 of=/root/boot-droidian-backup.img` (96 MiB, sha256 `95a645cb12d3625492d97eefa6bf40db3be0c6d41598b1749d8a191b15c40ae4`), copied to `bitra/backups/boot-before-mainline-20261122/` and re-hashed on the host.
+2. Image: `releases/mainline-boot-1.img` (= the tested `a-10`: normal-config kernel `7.2.0-bitra`, cmdline `bitra.root=userdata panic=0 consoleblank=0 earlycon=efifb keep_bootcon console=tty0 loglevel=4`), sha256 `22dc32fbd4ef235956e01c00f56ed35aea7b13084b36d740eb3cfdd0c373cf2d`, 24,166,400 bytes.
+3. Flash from the running phone with `tools/flash-boot.sh IMAGE SHA256` (checks the single `boot` partition, size, not mounted, image hash; dd; readback hash).
+4. `reboot` (no fastboot): the phone booted Alpine on its own (`androidboot.mode=normal`, root `sda11`).
+Recovery if a flashed image ever fails to boot: enter fastboot with the keys (the screen stays on the bootloader), `fastboot flash boot boot-droidian-backup.img` or flash any other known-good boot image; `fastboot boot IMG` also works from the keys-entered fastboot.
+Development flow now: build a test image, RAM-boot it (`ssh mac to-fastboot` from Alpine, `ramboot`), and flash it with `flash-boot.sh` only when it is good. The modules in the rootfs must match the kernel release (`7.2.0-bitra`).
