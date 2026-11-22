@@ -85,7 +85,7 @@ check that the cooling device actually throttles when the thermal trips are reac
 
 ## Audio round (2026-11-22, docs/31)
 - One unexplained reset during the first playback attempt (PulseAudio was also probing the card); not reproduced with PulseAudio stopped, nor with PulseAudio playing through the UCM sink. Keep watching.
-- UCM profile exists for the speaker only (docs/31); no microphone/earpiece/headset entries yet.
+- UCM profile covers the speaker and the bottom microphone (docs/31). Top microphone not found (all analog/digital inputs tried), no earpiece/headset entries yet. The mic needs the `bitra_mic` PulseAudio remap source because the second PCM channel is silent.
 - AFE commands right after the ADSP boot are rejected (status 0x16: LPASS vote, first clock SET_PARAM); they work minutes later. The vote reply is handled (fails fast), the first clock set is retried by deferred probing.
 - Older record in pstore (`dmesg-ramoops-0`, 971 s uptime): `fsa4480_switch_set` taking a corrupted mutex from `tcpm_snk_attach` -> `typec_set_orientation`, i.e. the USB-C stack using an FSA4480 that had been **unbound** by the standby-power bisect scripts (stale switch pointer after unbind). Not a regression of the normal configuration, but unbinding `fsa4480` while a typec switch references it is unsafe.
 - `cpu cpu7: Voltage update failed freq=3187200` / `failed to update OPP` at boot (the 3.19 GHz OPP of the SM8250-AC/870 does not get its voltage).
