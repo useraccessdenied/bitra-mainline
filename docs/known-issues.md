@@ -9,7 +9,7 @@ Logged 2026-11-21, reviewed 2026-11-22. Display = Samsung AMS662ZS01 via msm DPU
    (WARN in clk_core_disable/unprepare via `of_clk_add_hw_provider` -> `clk_core_reparent_orphans` in `dsi_phy_driver_probe`).
    Harmless so far; likely the PHY PLL being (un)prepared while ABL left it running (we boot with `clk_ignore_unused`).
 2. ~~fbcon text rendering~~ — **resolved 2026-11-22**: the Alpine login prompt and boot text render on the panel (tty1). The `sys_imageblit` message was not a blocker.
-3. **Panel suspend/resume** — never exercised (display off/on, runtime PM, backlight, TE/PLL re-lock).
+3. **Panel suspend/resume** — exercised 2026-11-22 as part of s2idle (devices suspend/resume OK, backlight restored, touch fine; docs/28). Still to check by eye: image intact after every wake, TE/PLL re-lock over many cycles.
 4. **ESD and TE behaviour over longer runs** — vendor DT enables ESD register polling (`0x9f 0x00 0x01 0x80`) and an ESD error GPIO;
    mainline driver has none. Only seconds-long animation runs were done; check long-run stability, TE misses, flicker.
 

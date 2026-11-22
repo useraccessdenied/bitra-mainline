@@ -4,6 +4,7 @@ Numbering continues the `bitra` workspace docs (00–17 cover LineageOS and Droi
 
 | Doc | What it is |
 |---|---|
+| [28-suspend-resume.md](28-suspend-resume.md) | s2idle suspend/resume: staged test, wake sources verified, gaps |
 | [27-hardware-status.md](27-hardware-status.md) | **Hardware status tracker**: working / partial / not working / untested per block, with evidence and next steps. Keep it current. |
 | [known-issues.md](known-issues.md) | Detailed open items, deferred owner items, parked fault-injection sweep state |
 | [25-alpine-rootfs.md](25-alpine-rootfs.md) | Alpine 3.24 on `userdata`: image builder, switch_root hook, how it was flashed, gotchas |
