@@ -4,6 +4,7 @@ Numbering continues the `bitra` workspace docs (00–17 cover LineageOS and Droi
 
 | Doc | What it is |
 |---|---|
+| [31-audio.md](31-audio.md) | ADSP firmware, sound card (model/routing/DP link), speaker playback, the readiness race, open items |
 | [30-phosh.md](30-phosh.md) | Phosh session (tinydm/elogind/NetworkManager/UPower), the cgroup cmdline fix, open items |
 | [29-graphics-gpu.md](29-graphics-gpu.md) | Sway on the panel (touch, keys, 120 Hz) and Adreno 650 acceleration (freedreno/turnip), firmware pitfalls |
 | [28-suspend-resume.md](28-suspend-resume.md) | s2idle suspend/resume: staged test, wake sources verified, gaps |

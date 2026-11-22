@@ -11,11 +11,11 @@ Companion repos
 
 ## Status (2026-11-22)
 Mainline **7.2.0 boots the phone into Alpine Linux 3.24 from UFS (`userdata`)**: console on the panel (fbcon), touchscreen, Wi-Fi, USB-NCM + SSH shells,
-battery gauge, thermal sensing, input devices for the hardware keys, and a **Phosh phone UI on the accelerated Adreno 650 GPU** (docs/29, 30; Sway also works). It boots standalone from the flashed `boot` partition (kernel + initramfs);
+battery gauge, thermal sensing, input devices for the hardware keys, and a **Phosh phone UI on the accelerated Adreno 650 GPU** (docs/29, 30; Sway also works), and **audio on both speakers** (ADSP firmware loads, docs/31). It boots standalone from the flashed `boot` partition (kernel + initramfs);
 the mainline boot image is **flashed to `boot`** (2026-11-22), so the phone boots Alpine by itself; test kernels are still RAM-booted with `fastboot boot`.
 
 Per-hardware status (working / partial / not working / untested) is tracked in **[docs/27-hardware-status.md](docs/27-hardware-status.md)** — keep it current.
-Biggest gaps: audio, cellular modem, camera and sensors (all need the remote processors / firmware work), charging control (fast charge), suspend, standalone boot.
+Biggest gaps: cellular modem, camera and sensors (CDSP/SLPI firmware is extracted, not enabled), audio beyond the speakers (microphones, earpiece, UCM), charging control (fast charge), suspend, standalone boot.
 
 ## Repository layout
 | Path | What |
@@ -28,7 +28,7 @@ Biggest gaps: audio, cellular modem, camera and sensors (all need the remote pro
 | `scripts/export_patches.py` | Exports the kernel commits to `patches/series/` |
 | `configs/bitra_defconfig` | `savedefconfig` of the working kernel build |
 | `patches/` | The kernel changes as a `git am` series (`patches/series/`, base in `patches/BASE`) |
-| `tools/` | `flash-boot.sh` (hash-checked flash of the `boot` partition from the phone), small freestanding aarch64 helpers (`bitra-reboot`, `bitra-drm`, `bitra-evtest`, `bitra-failnth`), Python hardware tests that run on the phone (`bitra-haptic.py`, `bitra-nfc.py`, `gpu-hang-test.py`, `nm-wifi-from-wpa.py`) and `gpu-stress.sh` and `soak.sh` (display soak / fault-injection harness) |
+| `tools/` | `flash-boot.sh` (hash-checked flash of the `boot` partition from the phone), small freestanding aarch64 helpers (`bitra-reboot`, `bitra-drm`, `bitra-evtest`, `bitra-failnth`), Python hardware tests that run on the phone (`bitra-haptic.py`, `bitra-nfc.py`, `gpu-hang-test.py`, `nm-wifi-from-wpa.py`, `tone.py`, `extract-dsp-firmware.py`) and `gpu-stress.sh` and `soak.sh` (display soak / fault-injection harness) |
 | `third_party/` | Fetched/vendored inputs (Alpine packages, touch driver series); mostly gitignored |
 | `releases/`, `build/` | Build outputs (gitignored) |
 

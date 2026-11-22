@@ -32,7 +32,8 @@ PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", 
             # Phosh (docs/30): session via tinydm autologin, elogind/polkit, NetworkManager owns Wi-Fi (usb0 unmanaged)
             "phosh", "phoc", "phosh-keyboard", "squeekboard", "elogind", "elogind-openrc", "polkit-elogind", "upower", "gnome-console",
             "gnome-session", "gnome-settings-daemon", "iio-sensor-proxy", "feedbackd", "networkmanager", "networkmanager-openrc",
-            "networkmanager-wifi", "networkmanager-cli", "tinydm", "tinydm-openrc", "xwayland", "mesa-gl"]
+            "networkmanager-wifi", "networkmanager-cli", "tinydm", "tinydm-openrc", "xwayland", "mesa-gl",
+            "alsa-utils", "alsa-utils-openrc"]
 TOOLS = [("bitra-reboot", False), ("bitra-failnth", False), ("bitra-drm", True), ("bitra-evtest", True)]
 
 
@@ -348,6 +349,10 @@ def inner(a):
     put("etc/NetworkManager/conf.d/bitra.conf", "[keyfile]\nunmanaged-devices=interface-name:usb0\n\n[main]\nplugins=keyfile\n")   # bitra is the first user (uid/gid 1000)
     # GPU: the device-specific signed ZAP shader (split MDT) from the stock vendor firmware; sqe/gmu come from linux-firmware-qcom
     zap = BITRA / "firmware/stock-a13/v-extract/vendor/firmware"
+    # DSP firmware (tools/extract-dsp-firmware.py from the modem partition backup); only the ADSP is enabled in the DT so far
+    dsp = ROOT / "third_party/firmware/qcom/sm8250/realme/bitra"
+    for f in sorted(dsp.glob("adsp.*")):
+        put("lib/firmware/qcom/sm8250/realme/bitra/" + f.name, f.read_bytes())
     for n in ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02"):
         if (zap / n).exists():
             put("lib/firmware/qcom/sm8250/realme/bitra/" + n, (zap / n).read_bytes())

@@ -61,9 +61,9 @@ Status: **Working** = verified on the phone | **Partial** = works with gaps (lis
 ## Audio / camera / remoteprocs
 | Item | Status | Evidence / gaps | Next step | Doc |
 |---|---|---|---|---|
-| Remoteprocs ADSP / CDSP / SLPI / MPSS | **Not working** | `/sys/class/remoteproc` is empty: none enabled/started. Blocks audio, sensors, modem, camera, some charging/PD features | firmware paths + `qcom_q6v5_pas`, test one at a time | 20 |
-| Audio (Q6 / WCD938x / WSA / macros) | **Not working** | No sound card. `snd-sm8250` deferred ("MultiMedia1: error getting cpu dai name"); LPASS pinctrl `33c0000` and macros wait for suppliers. | needs ADSP; fix LPASS pinctrl/macro deferrals | |
-| Speaker amplifiers 2x TFA987x | **Partial** | Both amps probe on i2c15 (0x34/0x35, chip revision 0x0c74); no audio path yet | after ADSP | 19 |
+| Remoteprocs ADSP / CDSP / SLPI / MPSS | **Partial** | **ADSP works (2026-11-22, docs/31):** firmware from the stock modem partition, `remoteproc0 adsp is now up` ~0.4 s after the module loads, APR/GPR audio services, FastRPC, PDR audio_pd; flashed in `mainline-boot-5`. CDSP and SLPI firmware extracted and checked (not enabled); modem is external (SDX55M, not MPSS). Memory map: the live DT already carries the stock layout | enable CDSP, then SLPI (sensors), one at a time | 31 |
+| Audio (Q6 / WCD938x / WSA / macros) | **Partial** | **Sound card registers and both speakers play clean** (owner-verified 2026-11-22): `sm8250 - realme GT Neo 2`, 8 MultiMedia PCMs, WCD938x bound on SoundWire, LPASS macros up. Fixes: ADSP enabled, sound node `model` + `audio-routing` (8T's), DisplayPort link removed, q6afe vote reply handled. Untested: microphones, earpiece, headset/USB-C, volume, PulseAudio (no UCM profile), one unexplained reset during the first playback | UCM profile, mic test, PulseAudio/PipeWire | 31 |
+| Speaker amplifiers 2x TFA987x | **Working** | Top and bottom speakers play a clean 440 Hz tone through Tertiary MI2S (owner-verified 2026-11-22); no kernel volume control, keep tones quiet while testing | volume/protection, music test | 31 |
 | USB-C audio mux FSA4480 | **Untested** | Probes on i2c15 @0x42 (i2cget works) | | |
 | Microphones / earpiece / headset | **Not tried** | | | |
 | Cameras (CAMSS) | **Not working** | No `/dev/video*`; `camss` and `venus` exist as modules but no sensor nodes, PM8008 camera regulators | sensor DT from stock, `persist/camera` calibration | 19 |

@@ -1,0 +1,30 @@
+# 31 — Audio: ADSP firmware, sound card, speakers (2026-11-22)
+
+Status: **partial, speakers work.** The ADSP boots from this phone's own firmware, the whole Q6/LPASS/SoundWire/WCD938x chain probes, the sound card `sm8250 - realme GT Neo 2` registers (8 MultiMedia PCMs, Headset Jack, USB Offload Jack)
+and a test tone plays **clean on both speakers** (owner-verified: top and bottom, a quiet and a louder tone). Flashed in `mainline-boot-5.img`. Not done: microphones, earpiece, headset/USB-C audio, volume control, UCM profile for PulseAudio.
+
+## What was needed
+1. **ADSP firmware** (`tools/extract-dsp-firmware.py`): the stock `modem` partition (FAT image from the 2026-11-16 backup) holds `image/adsp.mdt` + `adsp.b00-b18` (also `cdsp.*`, `slpi.*`). Each set is checked against its MDT header (every segment file present with the declared size).
+   All three are **relocatable** (`MDT_RELOCATABLE`), link ranges ADSP 0x89500000..0x8ba00000 (37 MiB), CDSP 20 MiB, SLPI 21 MiB: the kernel's MDT loader places them in the DT's reserved region, which must be at least that big.
+   Installed under `/lib/firmware/qcom/sm8250/realme/bitra/` (the remoteproc driver `qcom_q6v5_pas` is a module; the rootfs is mounted by then, no initramfs copy needed).
+2. **Reserved-memory map**: checked against the stock DT before enabling anything. The stock layout (205 MiB protected block at 0x80b00000, every carve-out shifted up by 0x7a00000, ADSP at 0x91b00000 / 37 MiB, CDSP 0x8f200000, SLPI 0x90600000, GPU zap 0x8e21a000)
+   differs from mainline's generic SM8250 map (ADSP 0x8a100000 / 29 MiB: too small for this firmware), but the **running device tree already carries the stock layout** (the bootloader patches the reserved-memory nodes, our DTB shim keeps them): `/proc/device-tree/.../memory-region` of the remoteproc nodes resolves to the stock regions. No change needed (`ours.dts` decompiled from the built DTB shows mainline's map; the live tree does not).
+3. **DT** (`sm8250-realme-bitra.dts`): `&adsp { firmware-name = ".../adsp.mdt"; status = "okay"; }`; `&sound` gets `model = "realme GT Neo 2"` and the **8T's `audio-routing`** (same WCD938x; this phone's real mic wiring is unverified) and drops `displayport-dai-link`.
+   Without a `model`, ASoC refuses the card with a **silent `-EINVAL`** (`snd-sm8250 sound: probe ... failed with error -22`, no other message); the DisplayPort link waited forever for `mdss_dp` (disabled): "DisplayPort Playback: codec dai not found".
+4. **Kernel** (`q6afe.c`): the ADSP answers `AFE_CMD_REMOTE_LPASS_CORE_HW_VOTE_REQUEST` with an error result (status 0x16) instead of the 0x100f5 response; the driver had no case for it, so every vote timed out after 3 s ("Unknown cmd 0x100f4", "AFE failed to vote (3)", LPASS pinctrl/macro clock enable -110).
+   The callback now completes the waiter, so the vote fails fast. (A different, upstream fix for the vote reply layout exists: Val Packett's [q6afe vote series](https://lkml.iu.edu/2605.0/08569.html); ours is a different failure mode.) The audio works with the vote rejected.
+
+## The readiness race (understood, not fixed)
+Right after the ADSP boots, the AFE service accepts no commands (vote and the first clock `SET_PARAM` rejected with 0x16, ~35 ms after boot); the same commands work minutes later (a manual re-probe of the VA macro succeeded, and then macros, SoundWire and WCD938x bound).
+`q6core_is_adsp_ready()` exists in the tree but nothing calls it, and calling it before the first AFE command did not change the early rejections (it probably reports ready at once), so that patch was dropped. In practice the sequence settles because the macros defer/retry.
+
+## Test procedure (no UCM profile yet)
+`apk add alsa-utils`; stop PulseAudio (`pkill pulseaudio`: it grabs the card and fails with "Failed to find a working profile"); route and play:
+`amixer -c 0 cset name="TERT_MI2S_RX Audio Mixer MultiMedia1" 1; aplay -D hw:0,0 tone.wav` (`tools/tone.py AMP` writes a 2 s 440 Hz stereo tone; start at amplitude 3000). The speaker amps (2x TFA9874 at 0x34/0x35 on i2c15, "top_spkr/bottom_spkr", Tertiary MI2S RX) have no mixer controls.
+
+## Open / next
+- **One unexplained reset**: during the very first playback attempt the phone reset (a `reboot ... 'bootloader'` line at 147 s, then it came back on the same test image) while PulseAudio was also grabbing the card; two later runs with PulseAudio stopped played fine. Suspects: PulseAudio probing the PCMs concurrently; not reproduced. Test with PulseAudio/PipeWire playing in Phosh before relying on it.
+- No UCM profile (`alsa-ucm-conf` has no entry for this card): PulseAudio finds no profile, so Phosh has no sound until one is written (speaker on `TERT_MI2S_RX`, WCD capture paths, voice-activation DMIC).
+- Untested: microphones (WCD/VA DMIC/AMIC wiring unverified), earpiece, headset jack events, USB-C audio (FSA4480 + the USB offload jack), volume and speaker protection (TFA amps have no kernel volume; start quiet), Bluetooth audio, calls (modem).
+- Kernel log noise: `qcom-soundwire ...: din-ports/dout-ports mismatch with controller`, `rx_macro: Unsorted reg_defaults`, `AFE failed to vote`, `cpu cpu7: Voltage update failed freq=3187200` (not audio).
+- CDSP and SLPI firmware sets are extracted and verified (CDSP/SLPI regions match) but not enabled; enable one at a time (docs/27).

@@ -55,3 +55,6 @@ Rollback images: `releases/mainline-boot-1.img` (previous), `bitra/backups/boot-
 
 ### Update 2026-11-22 (GPU): `mainline-boot-3.img` flashed
 GPU enabled in the DT, `CONFIG_DEVFREQ_THERMAL=y`, GPU firmware in the initramfs; sha256 `507beb960a6415f01a3f8efb084ccc1308fa1e8419e9b0e0b5099d8131c6b87b`; flashed over `mainline-boot-2` with `tools/flash-boot.sh` (readback OK, standalone boot verified). See docs/29.
+
+### Update 2026-11-22 (audio): `mainline-boot-5.img` flashed
+ADSP enabled + sound card model/routing + q6afe vote handling; sha256 `14afccb86766f670c026402e22f3681f507e50e514ddbc1c3d2a78e9db9daaec`; flashed over `mainline-boot-4` (readback OK, standalone boot verified, ADSP running, card registered, tone played). The ADSP firmware lives in the rootfs (`/lib/firmware/qcom/sm8250/realme/bitra/adsp.*`, installed live; the builder copies it from `third_party/firmware/` after `tools/extract-dsp-firmware.py`). See docs/31.
