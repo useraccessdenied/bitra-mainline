@@ -1,0 +1,32 @@
+== Sun Nov 22 12:41:51 UTC 2026 gpu-stress s1 load 300s kernel 7.2.0-bitra, cooling=/sys/class/thermal/cooling_device3
+-- vkmark scores per pass:
+[vertex] duration=15: FPS: 1305 FrameTime: 0.766 ms
+[shading] duration=15: FPS: 945 FrameTime: 1.058 ms
+[texture] duration=15: FPS: 1058 FrameTime: 0.945 ms
+[cube] duration=15: FPS: 4777 FrameTime: 0.209 ms
+                                   vkmark Score: 2021
+[vertex] duration=15: FPS: 1284 FrameTime: 0.779 ms
+[shading] duration=15: FPS: 871 FrameTime: 1.148 ms
+[texture] duration=15: FPS: 995 FrameTime: 1.005 ms
+[cube] duration=15: FPS: 4608 FrameTime: 0.217 ms
+                                   vkmark Score: 1939
+[vertex] duration=15: FPS: 1294 FrameTime: 0.773 ms
+[shading] duration=15: FPS: 912 FrameTime: 1.096 ms
+[texture] duration=15: FPS: 1062 FrameTime: 0.942 ms
+[cube] duration=15: FPS: 4743 FrameTime: 0.211 ms
+                                   vkmark Score: 2002
+[vertex] duration=15: FPS: 1268 FrameTime: 0.789 ms
+[shading] duration=15: FPS: 905 FrameTime: 1.105 ms
+[texture] duration=15: FPS: 1010 FrameTime: 0.990 ms
+[cube] duration=15: FPS: 4610 FrameTime: 0.217 ms
+                                   vkmark Score: 1948
+[vertex] duration=15: FPS: 1333 FrameTime: 0.750 ms
+[shading] duration=15: FPS: 936 FrameTime: 1.068 ms
+[texture] duration=15: FPS: 1032 FrameTime: 0.969 ms
+[cube] duration=15: FPS: 4803 FrameTime: 0.208 ms
+                                   vkmark Score: 2026
+-- kernel GPU/drm error lines before/after: 5 / 23
+-- load: 59 samples, GPU freq min/avg/max = 305/663/670 MHz, lowest max_freq 670 MHz, max cooling state 0, max temps: gpu-top 59.7 C, gpu-bottom 60.3 C, cpu7 60.1 C
+-- baseline gpu-top 36.8 C (avg of 4)
+-- end of cooldown gpu-top 40.3 C
+== done

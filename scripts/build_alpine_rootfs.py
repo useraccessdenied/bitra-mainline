@@ -28,7 +28,11 @@ PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", 
             # graphical session (docs/29): sway + Mesa (freedreno/turnip) + seat/udev stack
             "sway", "seatd", "foot", "grim", "wlr-randr", "swaybg", "mesa-dri-gallium", "mesa-egl", "mesa-gles", "mesa-gbm",
             "mesa-vulkan-freedreno", "vulkan-tools", "libinput-tools", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
-            "font-dejavu", "weston-clients", "mesa-demos", "wev", "linux-firmware-qcom"]
+            "font-dejavu", "weston-clients", "mesa-demos", "wev", "linux-firmware-qcom", "vkmark",
+            # Phosh (docs/30): session via tinydm autologin, elogind/polkit, NetworkManager owns Wi-Fi (usb0 unmanaged)
+            "phosh", "phoc", "phosh-keyboard", "squeekboard", "elogind", "elogind-openrc", "polkit-elogind", "upower", "gnome-console",
+            "gnome-session", "gnome-settings-daemon", "iio-sensor-proxy", "feedbackd", "networkmanager", "networkmanager-openrc",
+            "networkmanager-wifi", "networkmanager-cli", "tinydm", "tinydm-openrc", "xwayland", "mesa-gl"]
 TOOLS = [("bitra-reboot", False), ("bitra-failnth", False), ("bitra-drm", True), ("bitra-evtest", True)]
 
 
@@ -320,9 +324,9 @@ def inner(a):
     def chroot(*cmd, inp=None):
         return subprocess.run(["chroot", str(root), *cmd], check=True, input=inp)
 
-    for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("seatd", "default"),
+    for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("elogind", "default"), ("polkit", "default"), ("tinydm", "default"), ("networkmanager", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
-                     ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-wifi", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"),
+                     ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
@@ -336,7 +340,12 @@ def inner(a):
     for rel in ("home/bitra/.config/sway/config", "usr/local/bin/bitra-sway-start"):
         src = ROOT / "rootfs-overlay" / rel
         put(rel, src.read_bytes(), 0o755 if rel.startswith("usr/") else 0o644)
-    chroot("/bin/chown", "-R", "1000:1000", "/home/bitra")   # bitra is the first user (uid/gid 1000)
+    chroot("/bin/chown", "-R", "1000:1000", "/home/bitra")
+    # Phosh: tinydm autologin (uid 1000 = bitra) starts the phosh session; NetworkManager must not touch the USB gadget link
+    put("var/lib/tinydm/default-session.desktop", "", 0o644)
+    (root / "var/lib/tinydm/default-session.desktop").unlink()
+    (root / "var/lib/tinydm/default-session.desktop").symlink_to("/usr/share/wayland-sessions/phosh.desktop")
+    put("etc/NetworkManager/conf.d/bitra.conf", "[keyfile]\nunmanaged-devices=interface-name:usb0\n\n[main]\nplugins=keyfile\n")   # bitra is the first user (uid/gid 1000)
     # GPU: the device-specific signed ZAP shader (split MDT) from the stock vendor firmware; sqe/gmu come from linux-firmware-qcom
     zap = BITRA / "firmware/stock-a13/v-extract/vendor/firmware"
     for n in ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02"):

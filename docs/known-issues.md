@@ -71,3 +71,9 @@ Also: the boot partition used to hold Droidian; it now holds the mainline image 
 
 ## Parked by the owner (2026-11-22): system sleep (AOSD/CXSD/DDR)
 Standby is ~55-65 mA (about 1 day on the worn 1480 mAh pack) and `qcom_stats` aosd/cxsd/ddr stay 0; stock Android had similar battery life, so this is not a regression. Findings, sources and the cheap experiments left are in docs/28. Resume with `tools/sleepstat.sh` around a suspend.
+
+## Phosh / GPU round (2026-11-22, docs/29, 30)
+- Display: `dpu_crtc_get_vblank_counter` / `dpu_crtc_get_scanout_position` log "no encoder found for crtc 0" while the CRTC is disabled (upstream-side display driver noise).
+- `typec_displayport ... probe failed with error -71` when a USB-C partner attaches (DP alt mode, USB-C/PD work is open).
+- Wi-Fi is now managed by NetworkManager; `bitra-wifi`/`wpa_supplicant.conf` remain only as the source for `tools/nm-wifi-from-wpa.py`. A Wi-Fi password is still never baked into images.
+- Phosh needs display buffers divisible by its scale 3 (client issue only).

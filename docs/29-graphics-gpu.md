@@ -38,3 +38,15 @@ Sway on the `msm` KMS driver with `WLR_RENDERER=pixman`: owner confirmed on the 
 - No long-run GPU stress or GPU-hang recovery test; no GPU load vs thermals measurement.
 - No Xwayland, on-screen keyboard, screen lock/idle, brightness/rotation handling, auto-start of sway, D-Bus session. A real shell (Phosh) is the next step.
 - The image builder (`scripts/build_alpine_rootfs.py`) includes the graphics stack, user, overlay and ZAP firmware; a full image is ~1.3 GB (does not fit one agent `put`; the live system is the source of truth).
+
+
+## GPU tests (2026-11-22, Phosh running, flashed kernel features; tools `tools/gpu-stress.sh`, `tools/gpu-hang-test.py`; data in `docs/data/gpustress-s1-2026-11-22.*`)
+- **Raw speed** (vkmark, Turnip, mailbox present mode, 1080x2400 so it is divisible by Phosh's scale 3; `immediate` is not offered by the Wayland compositor): cube 4,670 fps, clear 5,371 fps, vkmark score 5,020 (short run);
+  the 4-scene sustained mix scored 1,939-2,026 per pass.
+- **Sustained load, 5 min** (vertex/shading/texture/cube looped, sampled every 5 s): per-scene fps flat over the whole run (vertex ~1,270-1,330, shading ~905-935, texture ~1,010-1,060, cube ~4,600-4,800); GPU held its top bin
+  (305 -> 670 MHz, average 663 MHz); peak temps gpu-top **59.7 C**, gpu-bottom **60.3 C**, cpu7 60.1 C (idle 36.8 C); cooling state never left 0 (the throttle trips are above this); back to ~40 C one minute after stopping.
+  No GPU faults/hangs in dmesg (only the display-side `dpu_crtc_get_* no encoder found for crtc 0` lines, docs/30).
+- **Hang recovery**: a headless EGL/GLES program draws with a never-ending shader (float loop counter that stops increasing at 2^24 against a larger uniform limit; an integer loop bound was silently bounded by the compiler and finished instantly,
+  and an unread result is skipped entirely, so the test reads a pixel back). The kernel logged `hangcheck detected gpu lockup rb 0`, `hangcheck recover!`, named the offending task (`python3`) and reset the GPU; the client's `glFinish` returned after ~2 s with a blank pixel, no crash.
+  Afterwards a fresh GL client, vkmark (cube 4,571 fps, same as before) and the Phosh compositor all rendered normally (the compositor shares the GPU and kept running).
+- Still untested: very long (hours) load, GPU load together with suspend cycles, other hang types (page faults/iommu faults), power draw of the GPU on battery.

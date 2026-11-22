@@ -60,6 +60,9 @@ esac
 echo "$DEV" > /tmp/switchroot.req
 echo "switching to $DEV (the shell connection will drop)"
 '''
+# the stock Android cmdline carries cgroup.memory=nokmem,nosocket; with it a 7.x kernel WARNs in set_shrinker_bit (mm/shrinker.c) when a
+# memcg-using service (OpenRC cgroups, the Phosh session) takes a THP fault; mainline does not need it
+b.CMDLINE = b.CMDLINE.replace("cgroup.memory=nokmem,nosocket ", "")
 b.INIT = b.INIT.replace(
     'while true; do log "alive $(cat /proc/uptime | cut -d\' \' -f1)s"; sleep 10; done',
     SWITCHROOT_LOOP)
