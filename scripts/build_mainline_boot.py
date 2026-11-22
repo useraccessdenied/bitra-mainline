@@ -35,6 +35,8 @@ while true; do
     log "switch_root: mounting $DEV"
     mkdir -p /newroot
     if mount -t ext4 -o rw,noatime "$DEV" /newroot; then
+      # keep the previous boot's pstore (ramoops console) before anything else can overwrite it: userspace may not live long enough to do it
+      mkdir -p /newroot/var/lib/pstore/early-$(cut -d. -f1 /proc/uptime); cp /pstore/* /newroot/var/lib/pstore/early-$(cut -d. -f1 /proc/uptime)/ 2>/dev/null
       # telnetd/udhcpd of the initramfs keep running (their shell is the new root's /bin/sh): a way in even if bitra-net fails
       mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore
       mkdir -p /newroot/run; mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /newroot/run   # /run must be volatile: openrc state otherwise survives reboots

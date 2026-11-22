@@ -1,0 +1,14 @@
+== Sun Nov 22 10:11:07 UTC 2026 unbind test h2 kernel 7.2.0-bitra skip:  
+10:11:08 stage base: SUSPENDING (alarm in 20 s)
+10:11:30 stage base: resumed OK (suspend_stats fail=0)
+10:11:30   unbound serial0-0
+10:11:31 stage bt: SUSPENDING (alarm in 20 s)
+10:11:53 stage bt: resumed OK (suspend_stats fail=0)
+10:11:53   unbound 0000:01:00.0
+10:11:54 stage wifi: SUSPENDING (alarm in 20 s)
+10:12:15 stage wifi: resumed OK (suspend_stats fail=0)
+10:12:15   removed PCI device 0000:01:00.0
+10:12:16 stage pciremove: SUSPENDING (alarm in 20 s)
+10:12:37 stage pciremove: resumed OK (suspend_stats fail=0)
+10:12:37   unbound 1c00000.pcie:pcie@0:wifi@0
+10:12:38 stage pwrctrl: SUSPENDING (alarm in 20 s)

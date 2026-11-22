@@ -1,0 +1,11 @@
+== Sun Nov 22 10:03:45 UTC 2026 unbind test h1 kernel 7.2.0-bitra skip:  
+10:03:46 stage base: SUSPENDING (alarm in 20 s)
+10:04:08 stage base: resumed OK (suspend_stats fail=0)
+10:04:08   unbound serial0-0
+10:04:09 stage bt: SUSPENDING (alarm in 20 s)
+10:04:31 stage bt: resumed OK (suspend_stats fail=0)
+10:04:31   unbound 0000:01:00.0
+10:04:32 stage wifi: SUSPENDING (alarm in 20 s)
+10:04:53 stage wifi: resumed OK (suspend_stats fail=0)
+10:04:53   unbound 1c00000.pcie:pcie@0:wifi@0
+10:04:54 stage pwrctrl: SUSPENDING (alarm in 20 s)

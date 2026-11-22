@@ -72,3 +72,27 @@ Findings:
   QCA6390 PMU rails (unbind pwrseq + ath11k + BT), the audio codec/amps (WCD938x rails `audio-codec-vdd-*` are held by a deferred codec, TFA987x x2, FSA4480), panel supplies in suspend (`ae94000.dsi.0-vdd/vddr/vddio`),
   the display subsystem (`mdss_gdsc` on), NFC/haptics chips, the PMIC regulators `vreg_bob` (6 users) and `vreg_s*`, DDR/`cx`/`mx` levels in the RPMh sleep set (needs `aoss`/`rpmh` debugging), and battery-side parts (charge pump / VOOC MCU quiescent).
 - Kernel release is pinned to `7.2.0-bitra` (`CONFIG_LOCALVERSION="-bitra"`, no `LOCALVERSION_AUTO`, and `export LOCALVERSION=` in the build environment so the build script does not append `+`): DT-only rebuilds keep matching modules.
+
+## Standby power bisect results (2026-11-22; logs in `docs/data/`, scripts `tools/suspend-power{3,4,5}.sh`, `tools/suspend-unbind-test.sh`)
+Cumulative unbinds, gauge average right after a 75 s suspend (noise about +-10 mA; the first minutes after boot read ~10 mA higher):
+
+| Run | M0 baseline | radios off (BT+ath11k, PCI endpoint+root port removed) | + pci-pwrctrl | haptics+NFC | + display pipeline | + TFA987x amps | + FSA4480 |
+|---|---|---|---|---|---|---|---|
+| p4 (phone up 6 min) | 56 mA | 57 | 56 | (hang in the next stage) | | | |
+| p5 (phone up 1 min) | 66 mA | | | 67 | 56 | 56 | 55 |
+
+**No peripheral unbind lowers suspend draw beyond the noise: the floor of ~55-65 mA (0.5 W at 8.4 V) is not in a driver-controlled device.**
+Evidence for where it is: `/sys/kernel/debug/qcom_stats` after several suspends in the same boot: **`aosd` count 0, `cxsd` count 0, `ddr` LPM counts 0**; the DDR frequency table shows memory
+idling at 768 MHz (the lowest ~547 MHz barely used), never in self-refresh. The SoC never enters its always-on / clock-shutdown / DDR-sleep states in s2idle.
+Only one cluster idle state exists in the DT (`cluster-sleep-0` = `0x4100c244`, "cluster llcc off": used 67k times) and nothing describes a system-level state; upstream has a history of trouble
+with exactly this (SM8250 cpuidle states were added, then [reverted](https://lkml.iu.edu/2210.2/01396.html) / [disabled](https://lore.kernel.org/lkml/CAMi1Hd2Qh-AO8JjwzwqYaQF3kyfC6R3K2t6jy3r2sSApTmwGGw@mail.gmail.com/T/)
+pending synchronisation between the RPMh RSC and the cluster PM domain; the original [review thread](https://lkml.iu.edu/hypermail/linux/kernel/2201.1/06321.html) describes the PSCI value; the OSI approach is discussed in the [sdm845 series](https://lore.kernel.org/all/20220630101403.1888541-1-abel.vesa@linaro.org/T/)).
+Reaching AOSD/CXSD on SM8250 needs RPMh sleep/wake sets flushed at the right moment, all votes (CX/MX/DDR/XO) dropped and the firmware (TZ/PSCI) agreeing; this is an upstream-wide gap, not a bitra bug. Next (own task): check `rpmh` flush
+in suspend, the `apps_rsc` power-domain wiring, the PSCI state ids the stock kernel uses (`lpm-levels` in the stock DT), and whether PSCI `SYSTEM_SUSPEND` is available.
+
+### Hangs found while bisecting (all reproduce with the phone plugged in; use `tools/suspend-unbind-test.sh`)
+- Unbinding `pci-pwrctrl-pwrseq` (`1c00000.pcie:pcie@0:wifi@0`) while the PCIe root port (`0000:00:00.0`) is still registered hangs the next s2idle suspend (watchdog reset). Removing the PCI endpoint is not enough; removing the root port first fixes it.
+- With the root port removed, unbinding `qca6390-pmu` (pwrseq-qcom_wcn) hangs the next suspend.
+- In p4, unbinding TFA987x x2 + FSA4480 on top of the removed PCIe host hung the next suspend, but the same unbinds alone (p5) are fine: the hangs are combinations of removed PCIe/pwrseq state, not single drivers.
+- After a hang the phone may reset a second time before userspace is up (the first reset's pstore log was lost). The initramfs now copies `/pstore` to `/var/lib/pstore/early-N` right after mounting the root (a-12; not yet in the flashed image), and the `bitra-pstore` service saves it at boot.
+- Open question: the saved `console-ramoops` of a hung boot ended at ~35 s of uptime in two cases (no suspend messages): the ramoops console may stop recording after `switch_root` or the reset loses the tail. Test with a marker + `echo c > /proc/sysrq-trigger`.

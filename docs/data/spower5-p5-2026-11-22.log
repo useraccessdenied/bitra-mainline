@@ -1,0 +1,42 @@
+== Sun Nov 22 10:43:07 UTC 2026 spower5 p5 kernel 7.2.0-bitra
+WAITING for UNPLUG of USB (up to 15 min). ~8 min run (4 cumulative stages, 75 s suspends). DO NOT TOUCH.
+unplugged rtc=1452200 st=Discharging v=8534000 i=-9000 q=1344000 cap=91 T=366
+unplug detected, settling 30 s
+M0: baseline (nothing unbound), suspend 75s
+  regulators with use>0: 57
+M0 before rtc=1452232 st=Discharging v=8494000 i=-155000 q=1343000 cap=91 T=365
+M0 after+0s rtc=1452309 st=Discharging v=8512000 i=-66000 q=1341000 cap=91 T=362
+M0 after+2s rtc=1452311 st=Discharging v=8513000 i=-74000 q=1341000 cap=91 T=362
+M1: haptics + NFC unbound
+  unbound 11-005a
+  unbound 1-0028
+M1: suspend 75s
+  regulators with use>0: 57
+M1 before rtc=1452313 st=Discharging v=8519000 i=-80000 q=1341000 cap=91 T=362
+M1 after+0s rtc=1452390 st=Discharging v=8496000 i=-67000 q=1339000 cap=91 T=359
+M1 after+2s rtc=1452392 st=Discharging v=8505000 i=-75000 q=1339000 cap=91 T=358
+M2: + display pipeline unbound (panel supplies, mdss domain)
+  unbound ae01000.display-controller
+M2: suspend 75s
+  regulators with use>0: 47
+M2 before rtc=1452395 st=Discharging v=8534000 i=-76000 q=1339000 cap=91 T=358
+M2 after+0s rtc=1452471 st=Discharging v=8519000 i=-56000 q=1338000 cap=91 T=356
+M2 after+2s rtc=1452474 st=Discharging v=8522000 i=-62000 q=1338000 cap=91 T=355
+M3: + speaker amps (TFA987x) unbound  [may hang]
+  unbound 15-0034
+  unbound 15-0035
+M3: suspend 75s
+  regulators with use>0: 47
+M3 before rtc=1452476 st=Discharging v=8529000 i=-64000 q=1338000 cap=91 T=355
+M3 after+0s rtc=1452552 st=Discharging v=8514000 i=-56000 q=1336000 cap=91 T=353
+M3 after+2s rtc=1452555 st=Discharging v=8519000 i=-62000 q=1336000 cap=91 T=353
+M4: + USB-C audio switch (FSA4480) unbound  [may hang]
+  unbound 15-0042
+M4: suspend 75s
+  regulators with use>0: 46
+M4 before rtc=1452556 st=Discharging v=8523000 i=-64000 q=1336000 cap=91 T=353
+M4 after+0s rtc=1452633 st=Discharging v=8512000 i=-55000 q=1335000 cap=91 T=351
+M4 after+2s rtc=1452635 st=Discharging v=8515000 i=-60000 q=1335000 cap=91 T=351
+RESULT p5 (uA, gauge average right after a 75 s suspend, cumulative): M0=-66000 M1=-67000 M2=-56000 M3=-56000 M4=-55000
+ALL DONE - replug USB, then REBOOT the phone
+== done

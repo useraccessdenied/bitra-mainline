@@ -1,0 +1,23 @@
+== Sun Nov 22 10:21:09 UTC 2026 unbind test h3 kernel 7.2.0-bitra skip:  
+10:21:10 stage base: SUSPENDING (alarm in 20 s)
+10:21:32 stage base: resumed OK (suspend_stats fail=0)
+10:21:32   unbound serial0-0
+10:21:33 stage bt: SUSPENDING (alarm in 20 s)
+10:21:55 stage bt: resumed OK (suspend_stats fail=0)
+10:21:55   unbound 0000:01:00.0
+10:21:56 stage wifi: SUSPENDING (alarm in 20 s)
+10:22:17 stage wifi: resumed OK (suspend_stats fail=0)
+10:22:17   removed PCI device 0000:01:00.0
+10:22:18 stage pciremove: SUSPENDING (alarm in 20 s)
+10:22:39 stage pciremove: resumed OK (suspend_stats fail=0)
+10:22:39   removed PCI root port 0000:00:00.0
+10:22:40 stage rootport: SUSPENDING (alarm in 20 s)
+10:23:01 stage rootport: resumed OK (suspend_stats fail=0)
+10:23:01   skip 1c00000.pcie (no /sys/bus/platform/drivers/qcom-pcie/unbind)
+10:23:02 stage pcie: SUSPENDING (alarm in 20 s)
+10:23:23 stage pcie: resumed OK (suspend_stats fail=0)
+10:23:23   unbound 1c00000.pcie:pcie@0:wifi@0
+10:23:24 stage pwrctrl: SUSPENDING (alarm in 20 s)
+10:23:45 stage pwrctrl: resumed OK (suspend_stats fail=0)
+10:23:45   unbound qca6390-pmu
+10:23:46 stage pmu: SUSPENDING (alarm in 20 s)

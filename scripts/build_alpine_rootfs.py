@@ -214,6 +214,19 @@ stop() { save; return 0; }
 extra_commands="save"
 """
 
+BITRA_PSTORE = """#!/sbin/openrc-run
+description="save the previous boot's pstore (ramoops console / panic logs) to /var/lib/pstore before the next boot overwrites it"
+depend() { need localmount; after bitra-time; }
+start() {
+    d=/var/lib/pstore/$(date +%Y%m%d-%H%M%S)
+    mkdir -p $d
+    for f in /pstore/* /sys/fs/pstore/*; do [ -f "$f" ] && cp "$f" $d/ 2>/dev/null; done
+    rmdir $d 2>/dev/null
+    ls -dt /var/lib/pstore/* 2>/dev/null | tail -n +11 | xargs rm -rf 2>/dev/null
+    return 0
+}
+"""
+
 FSTAB = "# <fs> <mountpoint> <type> <opts> <dump> <pass>\nLABEL=bitra-root / ext4 rw,noatime 0 1\n"
 INITTAB = """::sysinit:/sbin/openrc sysinit
 ::sysinit:/sbin/openrc boot
@@ -270,6 +283,7 @@ def inner(a):
     put("etc/init.d/bitra-net", BITRA_NET, 0o755)
     put("etc/init.d/bitra-growfs", BITRA_GROWFS, 0o755)
     put("etc/init.d/bitra-diag", BITRA_DIAG, 0o755)
+    put("etc/init.d/bitra-pstore", BITRA_PSTORE, 0o755)
     put("etc/init.d/bitra-time", BITRA_TIME, 0o755)
     put("etc/bitra-build-time", str(int(__import__("time").time())) + "\n")
     put("etc/init.d/bitra-wifi", BITRA_WIFI, 0o755)
@@ -303,7 +317,7 @@ def inner(a):
         return subprocess.run(["chroot", str(root), *cmd], check=True, input=inp)
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("mdev", "sysinit"), ("hwdrivers", "sysinit"),
-                     ("hostname", "boot"), ("bitra-time", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
+                     ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
                      ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-wifi", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():

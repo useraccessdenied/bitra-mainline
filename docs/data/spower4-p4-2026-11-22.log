@@ -1,0 +1,34 @@
+== Sun Nov 22 10:31:16 UTC 2026 spower4 p4 kernel 7.2.0-bitra
+WAITING for UNPLUG of USB (up to 15 min). ~9 min run (5 cumulative stages, 75 s suspends). DO NOT TOUCH.
+unplugged rtc=1451583 st=Discharging v=8534000 i=-2000 q=1343000 cap=91 T=365
+unplug detected, settling 30 s
+M0: baseline (nothing unbound), suspend 75s
+  regulators with use>0: 57
+M0 before rtc=1451615 st=Discharging v=8498000 i=-168000 q=1342000 cap=91 T=365
+M0 after+0s rtc=1451692 st=Discharging v=8516000 i=-56000 q=1341000 cap=91 T=362
+M0 after+2s rtc=1451694 st=Discharging v=8518000 i=-65000 q=1341000 cap=91 T=362
+M1: Bluetooth + Wi-Fi drivers off, PCI endpoint + root port removed
+  unbound serial0-0
+  unbound 0000:01:00.0
+  removed PCI 0000:01:00.0
+  removed PCI 0000:00:00.0
+M1: suspend 75s
+  regulators with use>0: 57
+M1 before rtc=1451698 st=Discharging v=8518000 i=-78000 q=1341000 cap=91 T=362
+M1 after+0s rtc=1451774 st=Discharging v=8524000 i=-57000 q=1339000 cap=91 T=358
+M1 after+2s rtc=1451776 st=Discharging v=8498000 i=-150000 q=1339000 cap=91 T=359
+M2: + pci-pwrctrl (Wi-Fi slot power control) unbound
+  unbound 1c00000.pcie:pcie@0:wifi@0
+M2: suspend 75s
+  regulators with use>0: 49
+M2 before rtc=1451777 st=Discharging v=8521000 i=-150000 q=1339000 cap=91 T=359
+M2 after+0s rtc=1451853 st=Discharging v=8520000 i=-56000 q=1338000 cap=91 T=356
+M2 after+2s rtc=1451855 st=Discharging v=8514000 i=-62000 q=1338000 cap=91 T=356
+M3: + audio codec, speaker amps, USB-C audio switch unbound
+  skip audio-codec
+  unbound 15-0034
+  unbound 15-0035
+  unbound 15-0042
+M3: suspend 75s
+  regulators with use>0: 44
+M3 before rtc=1451859 st=Discharging v=8516000 i=-73000 q=1337000 cap=91 T=356

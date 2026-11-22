@@ -1,0 +1,5 @@
+Count: 0 Count: 0 Count: 0 
+DDR Freq 1353Mhz:       CP IDX:9        count:742       Duration (ticks):822163353
+DDR Freq 1555Mhz:       CP IDX:10       count:291       Duration (ticks):47066394
+DDR Freq 1804Mhz:       CP IDX:11       count:50        Duration (ticks):4501703
+DDR Freq 2092Mhz:       CP IDX:12       count:680       Duration (ticks):3406961150

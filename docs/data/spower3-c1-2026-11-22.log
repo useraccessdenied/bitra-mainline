@@ -1,0 +1,17 @@
+== Sun Nov 22 09:23:33 UTC 2026 spower3 c1 kernel 7.2.0-bitra
+WAITING for UNPLUG of USB (up to 15 min). ~14 min run (cumulative unbind + 100 s suspends). DO NOT TOUCH.
+unplugged rtc=1447443 st=Discharging v=8437000 i=-8000 q=1216000 cap=83 T=357
+unplug detected, settling 30 s
+B0: baseline, nothing unbound, suspend 100s
+  regulators with use>0: 53
+B0 before rtc=1447475 st=Discharging v=8389000 i=-160000 q=1215000 cap=83 T=356
+B0 after+0s rtc=1447577 st=Discharging v=8395000 i=-65000 q=1212000 cap=82 T=353
+B0 after+2s rtc=1447579 st=Discharging v=8405000 i=-74000 q=1212000 cap=82 T=353
+B1: unbind Wi-Fi (ath11k), Bluetooth, WCN power sequencer
+  unbound 0000:01:00.0
+  unbound serial0-0
+  unbound 1c00000.pcie:pcie@0:wifi@0
+  unbound qca6390-pmu
+B1: suspend 100s
+  regulators with use>0: 47
+B1 before rtc=1447583 st=Discharging v=8413000 i=-83000 q=1212000 cap=82 T=353
