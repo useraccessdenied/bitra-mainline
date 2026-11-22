@@ -1,7 +1,8 @@
 #!/sbin/openrc-run
 # The sensor DSP needs ~100 s after hexagonrpcd attaches before the Sensor Core answers, and iio-sensor-proxy exits at once when it finds no
-# sensor. Wait in the background until an SSC sensor answers, then (re)start the proxy so Phosh gets auto-rotate (docs/32).
-description="Start iio-sensor-proxy once the SLPI sensors answer"
+# sensor. Wait in the background until an SSC sensor answers, then (re)start the proxy. Phosh only connects to the proxy when its session starts
+# (about two minutes before that on a cold boot), so restart the session once if it did not claim the accelerometer (docs/32).
+description="Start iio-sensor-proxy once the SLPI sensors answer, then let Phosh attach"
 
 depend() {
 	need hexagonrpcd-sdsp dbus
@@ -14,6 +15,18 @@ start() {
 		for i in 1 2 3 4 5 6 7 8; do
 			if timeout 40 ssccli --sensor accelerometer --timeout 3 2>&1 | grep -q measurement; then
 				rc-service iio-sensor-proxy restart >/dev/null 2>&1
+				sleep 5
+				if gdbus call --system --dest net.hadess.SensorProxy --object-path /net/hadess/SensorProxy \
+					--method org.freedesktop.DBus.Properties.Get net.hadess.SensorProxy AccelerometerOrientation 2>/dev/null | grep -q undefined; then
+					# "rc-service tinydm restart" only stops the autologin supervisor: the old compositor keeps running orphaned and the new
+					# session is started on top of it. Stop the supervisor, end the old session, then start a fresh one.
+					rc-service tinydm stop >/dev/null 2>&1
+					killall -TERM phoc >/dev/null 2>&1
+					for n in 1 2 3 4 5 6 7 8 9 10; do pidof phoc >/dev/null || break; sleep 1; done
+					killall -KILL phoc phosh gnome-session-binary >/dev/null 2>&1
+					sleep 1
+					rc-service tinydm start >/dev/null 2>&1
+				fi
 				exit 0
 			fi
 		done
