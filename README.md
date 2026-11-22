@@ -28,7 +28,7 @@ Biggest gaps: audio, cellular modem, camera, sensors and the GPU (all need the r
 | `scripts/export_patches.py` | Exports the kernel commits to `patches/series/` |
 | `configs/bitra_defconfig` | `savedefconfig` of the working kernel build |
 | `patches/` | The kernel changes as a `git am` series (`patches/series/`, base in `patches/BASE`) |
-| `tools/` | Small freestanding aarch64 helpers (`bitra-reboot`, `bitra-drm`, `bitra-evtest`, `bitra-failnth`) and `soak.sh` (display soak / fault-injection harness) |
+| `tools/` | Small freestanding aarch64 helpers (`bitra-reboot`, `bitra-drm`, `bitra-evtest`, `bitra-failnth`), Python hardware tests that run on the phone (`bitra-haptic.py`, `bitra-nfc.py`) and `soak.sh` (display soak / fault-injection harness) |
 | `third_party/` | Fetched/vendored inputs (Alpine packages, touch driver series); mostly gitignored |
 | `releases/`, `build/` | Build outputs (gitignored) |
 

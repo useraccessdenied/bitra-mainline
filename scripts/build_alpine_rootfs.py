@@ -24,7 +24,7 @@ FW_ROOT = Path(os.environ.get("FIRMWARE_DIR", "/usr/lib/firmware"))
 FW_FILES = ["regulatory.db", "regulatory.db.p7s", "ath11k/QCA6390/hw2.0/amss.bin", "ath11k/QCA6390/hw2.0/m3.bin",
             "ath11k/QCA6390/hw2.0/board-2.bin", "qca/htbtfw20.tlv", "qca/htnv20.bin"]
 PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", "e2fsprogs", "e2fsprogs-extra", "bluez", "dbus",
-            "wireless-regdb", "nano", "htop", "util-linux", "kbd"]
+            "wireless-regdb", "nano", "htop", "util-linux", "kbd", "curl", "i2c-tools", "evtest", "python3"]
 TOOLS = [("bitra-reboot", False), ("bitra-failnth", False), ("bitra-drm", True), ("bitra-evtest", True)]
 
 
@@ -285,6 +285,8 @@ def inner(a):
     for name, hdr in TOOLS:
         t = compile_tool(name, hdr)
         put(f"usr/local/bin/{name}", t.read_bytes(), 0o755)
+    for py in sorted((ROOT / "tools").glob("*.py")):
+        put(f"usr/local/bin/{py.name}", py.read_bytes(), 0o755)
     soak = ROOT / "tools/soak.sh"
     if soak.exists():
         put("usr/local/bin/soak.sh", soak.read_bytes(), 0o755)

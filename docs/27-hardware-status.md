@@ -1,7 +1,7 @@
 # 27 — Hardware status tracker (mainline 7.2.0 on realme GT Neo 2 / bitra)
 
 Single place to see what works. **Keep this file updated** whenever hardware is found, tested or fixed (date + evidence).
-Last full review: **2026-11-22**, kernel `7.2.0-g593dc521516f-dirty` + DT `dac11722c`, boot image `a-7.img`, Alpine 3.24 on `userdata`.
+Last full review: **2026-11-22** (quick tests of keys, haptics, NFC the same day), kernel `7.2.0-g593dc521516f-dirty` + DT `dac11722c`, boot image `a-7.img`, Alpine 3.24 on `userdata`.
 
 Status: **Working** = verified on the phone | **Partial** = works with gaps (listed) | **Not working** = understood, not done | **Untested** = driver/device present, function not verified | **Not tried** = no work yet | **Skip** = decided not to support.
 "Verified" below means seen on the real phone in a session; details live in the doc named in the last column. Open upstream-side kernel bugs are in docs/24, deferred owner items in docs/known-issues.md.
@@ -30,8 +30,8 @@ Status: **Working** = verified on the phone | **Partial** = works with gaps (lis
 | GPU Adreno 650 | **Not working** | `gpu`/`gmu` disabled in DT, no firmware; `/dev/dri/card0` + `renderD128` are KMS only (software rendering) | enable with `a650` firmware, test | |
 | DisplayPort / USB-C alt mode | **Not working** | `mdss_dp` disabled; FSA4480 mux probed on i2c15 | after USB-C role switch work | |
 | Touchscreen Synaptics S3908 (TouchComm) | **Partial** | Works (driver ported, docs/22). Open: suspend/resume, double-tap wake, axis orientation in a real UI, no pressure | wake + orientation tests | 22 |
-| Power key / volume keys | **Untested** | Input devices register: `pm8941_pwrkey`, `pm8941_resin` (vol-down), "Volume keys" (gpio-keys, vol-up). Key presses not tested this session | `bitra-evtest` while pressing | 26 |
-| Haptics AW8697 | **Untested** | Input device `aw8695-haptics` (event2) registers; vibration not tested. Chip may differ (AW8697 vs aw8695 driver) | test with ff-memless / sysfs | 19 |
+| Power key / volume keys | **Working** | Verified 2026-11-22 with `evtest`: power key = `KEY_POWER` (pm8941_pwrkey, event0); volume up and down = `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` on the "Volume keys" gpio-keys device (event4), with autorepeat. `pm8941_resin` (event1) gets no events: volume-down arrives via gpio-keys, so it is an unused duplicate | maybe drop the resin node from the DT; test long-press power behaviour (PMIC resets after a long hold) | 26 |
+| Haptics AW8697 (driver `aw8695-haptics`) | **Working** (basic) | Verified 2026-11-22: FF_RUMBLE effect upload + play via `tools/bitra-haptic.py`, owner felt 3 x 600 ms and 3 x 800 ms pulses. Untested: effect strength/waveform variety (FF_PERIODIC), f0 calibration quality, use from a UI | vibration profiles for a UI (feedbackd) | 19 |
 | Notification LED / flash | **Not tried** | No LEDs in `/sys/class/leds`; `pm8150l_flash` disabled in DT | check stock for an LED node | |
 | Ambient light / proximity / accelerometer / gyro / magnetometer | **Not working** | SLPI remoteproc not running (see Remoteprocs); IIO shows only PMIC ADCs | enable SLPI + sensor drivers | 20 |
 | Fingerprint (Jiiov, under display) | **Not tried** | Calibration data is in `persist`; no mainline driver known | research | 18 |
@@ -52,7 +52,7 @@ Status: **Working** = verified on the phone | **Partial** = works with gaps (lis
 |---|---|---|---|---|
 | Wi-Fi QCA6390 (ath11k, PCIe0) | **Partial** | WPA2/WPA3 connect, DHCP, internet, boot-time `bitra-wifi`. Gaps: placeholder MAC (`use-nv-mac` not read), generic firmware board data (no OEM BDF from `persist/bdwlan.elf`), scan stuck ("Resource busy") after `select_network`, power-save/suspend, regulatory (self-managed US), roaming | convert bdwlan.elf to board-2.bin, real MAC | 18, known-issues |
 | Bluetooth QCA6390 (hci0, uart6) | **Partial** | Controller + firmware load, classic inquiry works. LE scan unverified, BD address is a placeholder, no bluez daemon in use, no pairing/A2DP | run `bluetoothd` + `bluetoothctl`, real address | 18, known-issues |
-| NFC NQ-NCI | **Untested** | `nfc0` registered via nxp-nci on i2c1 @0x28 | tag read test | 19 |
+| NFC NQ-NCI (nxp-nci, i2c1 @0x28) | **Partial** | Verified 2026-11-22 with `tools/bitra-nfc.py` (kernel NFC netlink, no neard): controller powers up, polls and **detects an ISO14443-A target** (ATQA 0400, SAK 20 = ISO-DEP, random 4-byte UID). Untested: reading NDEF/tag data, other protocols (B, F, 15693), card emulation / host-card-emulation, p2p, antenna range, power use; neard is not in Alpine 3.24 | NDEF read (libnfc is not usable: it does not speak the kernel NCI subsystem), HCE | 19 |
 | Cellular modem (Qualcomm X55, external SDX55M over PCIe2/MHI + IPA) | **Not working** | `pcie2` disabled, MPSS not running, no modem nodes; SIM/IMS/calls/SMS/data none; must keep IMEI/modem NV safe (rmtfs) | docs/20 plan, rmtfs, MHI | 20 |
 | GNSS / GPS | **Not tried** | via modem/SLPI | after modem | |
 | FM radio (rtc6226) | **Skip** | | | 19 |

@@ -31,3 +31,10 @@ Gotchas found on the way:
 - `/run` must be a fresh tmpfs: after `switch_root` it was a directory on the disk, so OpenRC's "started" state survived reboots and services (bitra-time, sysctl, bootmisc, hostname, modules) were silently skipped.
   The initramfs now mounts tmpfs on `/newroot/run`.
 - Alpine's `hwclock` service (hctosys from the RTC) is pulled in by other services; `bitra-time` has `need hwclock` so it always runs after it.
+
+## Quick hardware tests (2026-11-22)
+- Keys: `evtest` on event0/1/4 while the owner pressed them: power, volume up, volume down all arrive; the PON `resin` device stays silent (volume-down is a gpio-key). See docs/27.
+- Haptics: `tools/bitra-haptic.py` (FF_RUMBLE through `EVIOCSFF`) — owner felt every pulse.
+- NFC: `tools/bitra-nfc.py` talks to the kernel NFC generic-netlink family directly (DEV_UP, START_POLL, GET_TARGET); detected an ISO14443-A target (ATQA 0400, SAK 20, UID 08a5b523).
+  Pitfall found: a netlink request with NLM_F_ACK leaves an ACK in the socket; read replies in a loop (the first datagram may just be the ack).
+- The image builder now also installs curl, i2c-tools, evtest and python3 and copies `tools/*.py` to `/usr/local/bin`, so a rebuilt image matches the live system.
