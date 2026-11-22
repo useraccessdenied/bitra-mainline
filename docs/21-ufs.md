@@ -1,6 +1,6 @@
 # 21 — UFS storage on mainline (read-only probe, 2026-11-21)
 
-Status: **works** (RAM boot, nothing mounted writable). Kernel 7.2.0, image `t-u1`. Details also summarised in docs/18.
+Status: **works**. *(Update 2026-11-22: since this read-only probe, `userdata` (sda11) holds the Alpine root, mounted read-write and verified by readback; see docs/25.)* Original text: RAM boot, nothing mounted writable. Kernel 7.2.0, image `t-u1`. Details also summarised in docs/18.
 
 ## Hardware
 - Controller: Qualcomm UFS HC `1d84000.ufshc` (+ QMP UFS PHY), driver `ufshcd-qcom` (built in: SCSI_UFSHCD_PLATFORM, SCSI_UFS_QCOM, BLK_DEV_SD, PHY_QCOM_QMP_UFS).

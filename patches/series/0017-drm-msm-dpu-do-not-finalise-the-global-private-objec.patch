@@ -1,0 +1,37 @@
+From 7d8925a6ca2bcf7482dd3e52a8517ffeb9426649 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 12:43:50 +0530
+Subject: [PATCH 17/22] drm/msm/dpu: do not finalise the global private object
+ twice
+
+dpu_kms_destroy() calls drm_atomic_private_obj_fini() unconditionally. struct dpu_kms survives unbind/bind, so a failed
+bring-up that bails out before drm_atomic_private_obj_init() (or any teardown after a completed one) finalises the previous
+incarnation's object again: KASAN double-free in dpu_kms_global_destroy_state(), found with a fail-nth sweep.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c
+index da3556eb6..7db4a2eb9 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c
+@@ -402,7 +402,17 @@ static const struct drm_private_state_funcs dpu_kms_global_state_funcs = {
+ 
+ static void dpu_kms_global_obj_fini(struct dpu_kms *dpu_kms)
+ {
++	/*
++	 * struct dpu_kms outlives the DRM device across unbind/bind, and
++	 * dpu_kms_destroy() also runs when hw_init failed before the private
++	 * object was set up (or after an earlier teardown already finalised
++	 * it): finalising twice frees the state twice.
++	 */
++	if (!dpu_kms->global_state.funcs)
++		return;
++
+ 	drm_atomic_private_obj_fini(&dpu_kms->global_state);
++	memset(&dpu_kms->global_state, 0, sizeof(dpu_kms->global_state));
+ }
+ 
+ static int dpu_kms_parse_data_bus_icc_path(struct dpu_kms *dpu_kms)

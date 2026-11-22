@@ -1,0 +1,32 @@
+From 593dc521516f07251ac2988182fd24049d0b1f75 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 23:20:17 +0530
+Subject: [PATCH 21/22] drm/msm/dpu: clear rpm_enabled after pm_runtime_disable
+
+struct dpu_kms outlives a single bind, but dpu_kms_destroy() left rpm_enabled
+set after disabling runtime PM. A later bind failing before dpu_kms_init()
+then disabled runtime PM again, unbalancing the disable depth
+('Unbalanced pm_runtime_enable!' on the following successful bind). Found
+with failslab fail-nth fault injection.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c
+index 7db4a2eb9..9e5588011 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_kms.c
+@@ -927,8 +927,10 @@ static void dpu_kms_destroy(struct msm_kms *kms)
+ 
+ 	msm_kms_destroy(&dpu_kms->base);
+ 
+-	if (dpu_kms->rpm_enabled)
++	if (dpu_kms->rpm_enabled) {
+ 		pm_runtime_disable(&dpu_kms->pdev->dev);
++		dpu_kms->rpm_enabled = false;
++	}
+ }
+ 
+ static int dpu_irq_postinstall(struct msm_kms *kms)

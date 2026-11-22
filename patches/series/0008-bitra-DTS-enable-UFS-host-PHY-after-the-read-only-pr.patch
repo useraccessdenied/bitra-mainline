@@ -1,0 +1,26 @@
+From 2c670a5497f534788a71b3e5f31eebe262a31e28 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 02:58:34 +0530
+Subject: [PATCH 08/22] bitra DTS: enable UFS (host + PHY) after the read-only
+ probe verified it
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 8778e00a4..312692c04 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -44,9 +44,7 @@ &framebuffer {
+ 	stride = <(1080 * 4)>;
+ };
+ 
+-/* Never touch storage, GPU, DP, PCIe or remoteprocs until verified; the display pipeline is enabled for the panel bring-up */
+-&ufs_mem_hc { status = "disabled"; };
+-&ufs_mem_phy { status = "disabled"; };
++/* Never touch GPU, DP, PCIe2 (modem) or remoteprocs until verified; UFS is enabled for the read-only probe; the display pipeline is enabled for the panel bring-up */
+ &mdss_dp { status = "disabled"; };
+ &gpu { status = "disabled"; };
+ &gmu { status = "disabled"; };

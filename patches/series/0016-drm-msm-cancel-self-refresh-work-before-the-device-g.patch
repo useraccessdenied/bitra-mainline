@@ -1,0 +1,66 @@
+From 584df0429a90a9073ddb1c07543ea2ee3e6e0c8e Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 12:24:45 +0530
+Subject: [PATCH 16/22] drm/msm: cancel self-refresh work before the device
+ goes away, clear stale event worker pointers
+
+Found with a deterministic fail-nth sweep over the panel probe on a KASAN kernel:
+- drm_self_refresh_helper_entry_work() takes a drm_dev reference when it runs; cancelling it from a drmm action
+  (dpu_crtc_init) is too late, the device is already being released: 'refcount_t: addition on 0' / underflow.
+  Cancel and free it in msm_drm_kms_uninit() while the device is still referenced (the helper cleanup is idempotent).
+- msm_drm_kms_uninit() destroyed kms->event_thread[].worker without clearing the pointer. struct msm_kms outlives
+  the DRM device across unbind/bind, so a later failed bring-up that reached msm_drm_kms_uninit() destroyed the stale
+  workers again: slab-use-after-free in kthread_destroy_worker().
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/msm_kms.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_kms.c b/drivers/gpu/drm/msm/msm_kms.c
+index e5d0ea629..da7c9e3cd 100644
+--- a/drivers/gpu/drm/msm/msm_kms.c
++++ b/drivers/gpu/drm/msm/msm_kms.c
+@@ -13,6 +13,7 @@
+ #include <drm/drm_drv.h>
+ #include <drm/drm_mode_config.h>
+ #include <drm/drm_vblank.h>
++#include <drm/drm_self_refresh_helper.h>
+ #include <drm/clients/drm_client_setup.h>
+ 
+ #include "disp/msm_disp_snapshot.h"
+@@ -231,6 +232,7 @@ void msm_drm_kms_uninit(struct device *dev)
+ 	struct msm_drm_private *priv = platform_get_drvdata(pdev);
+ 	struct drm_device *ddev = priv->dev;
+ 	struct msm_kms *kms = priv->kms;
++	struct drm_crtc *crtc;
+ 	int i;
+ 
+ 	BUG_ON(!kms);
+@@ -242,10 +244,25 @@ void msm_drm_kms_uninit(struct device *dev)
+ 
+ 	flush_workqueue(kms->wq);
+ 
++	/*
++	 * The self-refresh helper's delayed entry work takes a reference on the
++	 * DRM device when it runs (drm_atomic_commit_init). It must be gone
++	 * while we still hold ours: cancelling it from a drmm action is too
++	 * late, the device is already being released (found with a fail-nth
++	 * sweep: "refcount_t: addition on 0" / underflow in
++	 * drm_self_refresh_helper_entry_work after a failed or torn-down
++	 * bring-up).
++	 */
++	drm_for_each_crtc(crtc, ddev)
++		drm_self_refresh_helper_cleanup(crtc);
++
+ 	/* clean up event worker threads */
+ 	for (i = 0; i < MAX_CRTCS; i++) {
+-		if (kms->event_thread[i].worker)
++		if (kms->event_thread[i].worker) {
+ 			kthread_destroy_worker(kms->event_thread[i].worker);
++			/* kms outlives the DRM device across unbind/bind: no stale pointer */
++			kms->event_thread[i].worker = NULL;
++		}
+ 	}
+ 
+ 	drm_kms_helper_poll_fini(ddev);

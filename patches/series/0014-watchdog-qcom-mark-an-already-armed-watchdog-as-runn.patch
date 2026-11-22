@@ -1,0 +1,32 @@
+From 50c10c1c47410ac45bacd2c943f385b1e850ca9a Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 04:08:35 +0530
+Subject: [PATCH 14/22] watchdog: qcom: mark an already-armed watchdog as
+ running at probe
+
+When the bootloader leaves the apps watchdog enabled, tell the watchdog core (WDOG_HW_RUNNING) so it keeps petting it until userspace opens the device. Without it a slow boot (e.g. a KASAN/lockdep kernel) is reset by the bootloader's watchdog before init runs.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/watchdog/qcom-wdt.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
+index 49bd04841..c533737a6 100644
+--- a/drivers/watchdog/qcom-wdt.c
++++ b/drivers/watchdog/qcom-wdt.c
+@@ -333,6 +333,14 @@ static int qcom_wdt_probe(struct platform_device *pdev)
+ 		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
+ 	}
+ 
++	/*
++	 * The bootloader (ABL on the realme GT Neo 2) leaves the watchdog armed. Tell the core so that
++	 * it keeps petting it from here on (watchdog.handle_boot_enabled) until userspace takes over;
++	 * otherwise a slow boot, e.g. a KASAN/lockdep kernel, gets reset before init runs.
++	 */
++	if (readl(wdt_addr(wdt, WDT_EN)) & QCOM_WDT_ENABLE)
++		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
++
+ 	ret = devm_watchdog_register_device(dev, &wdt->wdd);
+ 	if (ret)
+ 		return ret;

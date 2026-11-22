@@ -1,0 +1,47 @@
+From 4f0778d7b3004ac95f9b16313eba79f7f61b1dde Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 01:23:37 +0530
+Subject: [PATCH 02/22] Add AI_DISCLOSURE.md and ATTRIBUTION.md
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ AI_DISCLOSURE.md | 11 +++++++++++
+ ATTRIBUTION.md   | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
+ create mode 100644 AI_DISCLOSURE.md
+ create mode 100644 ATTRIBUTION.md
+
+diff --git a/AI_DISCLOSURE.md b/AI_DISCLOSURE.md
+new file mode 100644
+index 000000000..1c5eb4306
+--- /dev/null
++++ b/AI_DISCLOSURE.md
+@@ -0,0 +1,11 @@
++# AI usage disclosure
++
++The `bitra` branch of this fork (realme GT Neo 2 bring-up: device tree, ABL DTB shim, debug console patches and
++future drivers) was developed with substantial assistance from an AI coding assistant (Claude Code by Anthropic),
++directed by the repository owner: research, code and patch authoring, build debugging and documentation.
++
++- **Experimental and only partly tested on hardware; provided as-is, without warranty.** Booting custom kernels can
++  lose data; the tested path is RAM-only (`fastboot boot`).
++- AI-assisted commits carry a `Co-Authored-By: Claude` trailer. Code and comments may be wrong or out of date; verify.
++- The AI did not flash any device; any flashing is done manually by the owner.
++- Code written here that touches subsystem code is intended for upstreaming only after human review.
+diff --git a/ATTRIBUTION.md b/ATTRIBUTION.md
+new file mode 100644
+index 000000000..0b55ca1b4
+--- /dev/null
++++ b/ATTRIBUTION.md
+@@ -0,0 +1,11 @@
++# Attribution
++
++This fork only adds commits on branch `bitra`. All other code, history and authorship are from upstream.
++
++| Component | Credit |
++|---|---|
++| Linux kernel | Linus Torvalds and contributors, GPL-2.0 |
++| SM8250 mainline base tree (7.2.0, tag `sm8250-7.2.0_git20261010`) | the Nura (formerly postmarketOS) SM8250 kernel maintainers (https://gitlab.nura.eco/soc/qualcomm-sm8250/linux) |
++| OnePlus 8 Pro measured changes and `omnipha` branch | omnipha — https://github.com/omnipha/linux-qualcomm-sm8250 (this fork's parent) |
++| `sm8250-oneplus-common.dtsi` / kebab (reused for the memory map) | the OnePlus SM8250 mainline contributors |
++| Ideas for ABL handling (U-Boot chainload, merged-FDT notes) | provasish/hakios-spartan (read for facts only; no code copied) |

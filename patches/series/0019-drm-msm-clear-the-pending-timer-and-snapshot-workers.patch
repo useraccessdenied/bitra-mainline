@@ -1,0 +1,75 @@
+From 6e08a12ede010c7706b4f0fdbdf3c1d01e6ed649 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 16:43:25 +0530
+Subject: [PATCH 19/22] drm/msm: clear the pending-timer and snapshot workers
+ on teardown, test the snapshot worker for NULL
+
+Same lifetime class as the event_thread and kms->wq fixes: struct msm_kms survives unbind/bind, so a failed next bring-up
+that unwinds through dpu_kms_destroy()/msm_disp_snapshot_destroy() destroyed already-destroyed kthread workers.
+- msm_atomic_destroy_pending_timer(): clear timer->worker (KASAN slab-use-after-free in kthread_destroy_worker).
+- msm_disp_snapshot_init() stored an ERR_PTR in kms->dump_worker when the worker could not be created and the destroy path
+  then dereferenced it (null-ptr-deref); store NULL, clear after destroy, and do not queue to a missing worker.
+Found by the last points (N=733..739) of a fail-nth sweep over the panel probe.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/disp/msm_disp_snapshot.c | 12 +++++++++---
+ drivers/gpu/drm/msm/msm_atomic.c             |  5 ++++-
+ 2 files changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/disp/msm_disp_snapshot.c b/drivers/gpu/drm/msm/disp/msm_disp_snapshot.c
+index d99771684..aef746dd3 100644
+--- a/drivers/gpu/drm/msm/disp/msm_disp_snapshot.c
++++ b/drivers/gpu/drm/msm/disp/msm_disp_snapshot.c
+@@ -91,7 +91,8 @@ void msm_disp_snapshot_state(struct drm_device *drm_dev)
+ 	priv = drm_dev->dev_private;
+ 	kms = priv->kms;
+ 
+-	kthread_queue_work(kms->dump_worker, &kms->dump_work);
++	if (kms->dump_worker)
++		kthread_queue_work(kms->dump_worker, &kms->dump_work);
+ }
+ 
+ int msm_disp_snapshot_init(struct drm_device *drm_dev)
+@@ -110,8 +111,11 @@ int msm_disp_snapshot_init(struct drm_device *drm_dev)
+ 	mutex_init(&kms->dump_mutex);
+ 
+ 	kms->dump_worker = kthread_run_worker(0, "%s", "disp_snapshot");
+-	if (IS_ERR(kms->dump_worker))
++	if (IS_ERR(kms->dump_worker)) {
+ 		DRM_ERROR("failed to create disp state task\n");
++		/* msm_disp_snapshot_destroy() and the queueing side test for NULL, not for ERR_PTR */
++		kms->dump_worker = NULL;
++	}
+ 
+ 	kthread_init_work(&kms->dump_work, _msm_disp_snapshot_work);
+ 
+@@ -131,8 +135,10 @@ void msm_disp_snapshot_destroy(struct drm_device *drm_dev)
+ 	priv = drm_dev->dev_private;
+ 	kms = priv->kms;
+ 
+-	if (kms->dump_worker)
++	if (kms->dump_worker) {
+ 		kthread_destroy_worker(kms->dump_worker);
++		kms->dump_worker = NULL;
++	}
+ 
+ 	mutex_destroy(&kms->dump_mutex);
+ }
+diff --git a/drivers/gpu/drm/msm/msm_atomic.c b/drivers/gpu/drm/msm/msm_atomic.c
+index a8babf1db..24b8ccac0 100644
+--- a/drivers/gpu/drm/msm/msm_atomic.c
++++ b/drivers/gpu/drm/msm/msm_atomic.c
+@@ -132,8 +132,11 @@ int msm_atomic_init_pending_timer(struct msm_pending_timer *timer,
+ 
+ void msm_atomic_destroy_pending_timer(struct msm_pending_timer *timer)
+ {
+-	if (timer->worker)
++	if (timer->worker) {
+ 		kthread_destroy_worker(timer->worker);
++		/* struct msm_kms outlives the DRM device; a failed next bring-up destroys it again */
++		timer->worker = NULL;
++	}
+ }
+ 
+ static bool can_do_async(struct drm_atomic_commit *state,

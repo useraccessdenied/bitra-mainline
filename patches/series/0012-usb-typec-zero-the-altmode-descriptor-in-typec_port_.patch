@@ -1,0 +1,27 @@
+From ee1805433e00e3709c8a9999f979e9a1c27dabe0 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 04:08:34 +0530
+Subject: [PATCH 12/22] usb: typec: zero the altmode descriptor in
+ typec_port_register_altmodes()
+
+desc was left uninitialised on the stack; only svid, vdo and mode are set before it is passed to typec_port_register_altmode(), which copies desc->mode_selection (a bool) and desc->roles. UBSAN on a KASAN/UBSAN debug kernel (realme GT Neo 2, qcom pmic-typec):
+  UBSAN: invalid-load in drivers/usb/typec/class.c:658: load of value 128 is not a valid value for type 'bool'
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/usb/typec/class.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/typec/class.c b/drivers/usb/typec/class.c
+index 0595e8cb8..7bb491ddc 100644
+--- a/drivers/usb/typec/class.c
++++ b/drivers/usb/typec/class.c
+@@ -2613,7 +2613,7 @@ void typec_port_register_altmodes(struct typec_port *port,
+ 	struct typec_altmode **altmodes, size_t n)
+ {
+ 	struct fwnode_handle *child;
+-	struct typec_altmode_desc desc;
++	struct typec_altmode_desc desc = { };
+ 	struct typec_altmode *alt;
+ 	size_t index = 0;
+ 	u16 svid;

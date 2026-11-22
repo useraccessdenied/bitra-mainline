@@ -2,21 +2,21 @@
 
 > Per-hardware status of everything found so far lives in **docs/27-hardware-status.md**; this file holds the detailed open items.
 
-Logged 2026-11-21. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (see docs/18).
+Logged 2026-11-21, reviewed 2026-11-22. Display = Samsung AMS662ZS01 via msm DPU/DSI, kernel 7.2.0 (see docs/18).
 
 ## Display (marked for later by the owner)
 1. **DSI PHY warnings at boot** — `DSI PLL(0) lock failed, status=0x0`, `dsi0_phy_pll_out_dsiclk already disabled/unprepared`
    (WARN in clk_core_disable/unprepare via `of_clk_add_hw_provider` -> `clk_core_reparent_orphans` in `dsi_phy_driver_probe`).
    Harmless so far; likely the PHY PLL being (un)prepared while ABL left it running (we boot with `clk_ignore_unused`).
-2. **fbcon text rendering** — `fb0: sys_imageblit: framebuffer is not in virtual address space` on the msmdrmfb fbdev; console text
-   is not verified to render on the panel (kernel log is read through the agent instead).
+2. ~~fbcon text rendering~~ — **resolved 2026-11-22**: the Alpine login prompt and boot text render on the panel (tty1). The `sys_imageblit` message was not a blocker.
 3. **Panel suspend/resume** — never exercised (display off/on, runtime PM, backlight, TE/PLL re-lock).
 4. **ESD and TE behaviour over longer runs** — vendor DT enables ESD register polling (`0x9f 0x00 0x01 0x80`) and an ESD error GPIO;
    mainline driver has none. Only seconds-long animation runs were done; check long-run stability, TE misses, flicker.
 
 ## Other open items
-- UFS (read-only probe first, explicit go-ahead needed), touch (Synaptics S3908 TouchComm driver), Wi-Fi/BT (QCA6390), USB-C PD,
-  audio, modem (external SDX55M over PCIe/MHI), sensors, camera. See docs/20 (in this repo) for the order.
+Done since the first list: UFS (read/write, rootfs on `userdata`), touch, Wi-Fi/BT bring-up, battery gauge, thermal sensing, Alpine userspace (docs/21, 22, 25, 26).
+Still open (see docs/27-hardware-status.md for the full table): USB-C PD/role switching, audio, modem (external SDX55M over PCIe/MHI), sensors, camera, GPU,
+charging control, suspend/resume, standalone boot. See docs/20 for the order.
 - ABL only accepts Droidian's DTB carrier + kernel-side DTB shim (CONFIG_BITRA_DTB_SHIM); a U-Boot stage would remove it.
 - `fastboot` entered with hardware keys makes ABL refuse images ("Load Error"); use `to-fastboot` from the running OS.
 
@@ -51,3 +51,13 @@ State: kernel fork `bitra` at 593dc5215 (candidates #1-#14 in docs/24); image `r
 - To do: understand why `left` stays 0 up to N=3000 (real end of the bind's allocations not found; check the semantics of `left` for large N); re-run N=1..400 and a full 746..900 on t-dbg10; then other drivers (UFS, ath11k, panel) with the same helper.
 - Open upstream-side items: devcoredump pinning drm_device (#10), msm_gem.c:170 (#11), "encoder is disabled" (#12), rpmh.c:386 WARN from sugov (new, unexamined).
 - Resume with: `ssh mac "sh 'soak.sh failnth FROM TO OUT [STEP]'"` on a t-dbgN RAM boot (docs/23).
+
+## System items found 2026-11-22 (Alpine round, docs/25, 26)
+- The bitra-agent shell is telnet as root on 0.0.0.0:23 (owner's choice for development); sshd uses the dev password `bitra`. Harden before the phone leaves the desk.
+- No watchdog service in Alpine: the initramfs' pet loop keeps running after switch_root; replace it with an OpenRC service.
+- Alpine's `hwclock` is pulled in by other services and does hctosys from the read-only RTC; `bitra-time` has `need hwclock` to run after it (docs/26).
+- Kernel and modules must match (release string contains the git hash, `-dirty` if the tree is dirty): rebuild/push them together.
+- `bitra-agent put` fails for single files around 2 GiB (EINVAL); keep transfers under about 1 GiB.
+- `rpmh.c:386` WARN from `sugov` (cpufreq) seen once on a debug kernel; unexamined.
+- Boot-time `clk_core_disable/unprepare` WARNs (~19 s, kworker) — DSI PHY related (item 1 above).
+- Charger: MP2650 / Oplus charge pump / RK826 VOOC MCU / SMB1390 are not driven; charging works by hardware default, fast charging does not (docs/26).

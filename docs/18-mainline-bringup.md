@@ -1,5 +1,9 @@
 # 18 — Mainline Linux bring-up (stage 1: RAM boot + USB NCM shell) — 2026-11-21
 
+> **Historical log.** This is the chronological stage-1 bring-up record (written 2026-11-21). For the current state see
+> [27-hardware-status.md](27-hardware-status.md) (per-hardware status), [25-alpine-rootfs.md](25-alpine-rootfs.md) (Alpine on UFS) and the README.
+> The kernel changes are now exported as a series in `patches/series/` (the single `patches/mainline/0001-...patch` mentioned below no longer exists).
+
 Goal: boot a mainline kernel on the GT Neo 2 (bitra, SM8250-AC) with the same USB-NCM debug link as the Droidian work.
 Base: postmarketOS SM8250 mainline fork as carried by github.com/omnipha/linux-qualcomm-sm8250 (branch `omnipha`, 7.2.0).
 Our changes: `patches/mainline/0001-bitra-stage1-bringup.patch` (branch `bitra` in roms/mainline/linux, untracked).

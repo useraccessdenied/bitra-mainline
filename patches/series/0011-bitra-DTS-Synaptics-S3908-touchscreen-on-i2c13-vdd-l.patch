@@ -1,0 +1,42 @@
+From 4dbb0bd0e9f01390d624626d4a0768b6aa90d828 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 03:31:56 +0530
+Subject: [PATCH 11/22] bitra DTS: Synaptics S3908 touchscreen on i2c13 (vdd =
+ l11c 3.0 V, avdd = l1c 1.8 V, irq tlmm39, reset tlmm38)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../boot/dts/qcom/sm8250-realme-bitra.dts     | 23 +++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 312692c04..7a8ceefea 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -106,3 +106,26 @@ bluetooth {
+ 		local-bd-address = [ ad 5a 05 7a b1 02 ];	/* 02:b1:7a:05:5a:ad, stored little-endian */
+ 	};
+ };
++
++/*
++ * Touchscreen: Synaptics S3908 (TouchComm "oncell"), same address/GPIOs as the OnePlus 8T but different rails:
++ * stock vdd = pm8150a_l11 (2.9-3.3 V) = vreg_l11c_3p0, stock vcc (io) = pm8150a_l1 (1.8 V) = vreg_l1c_1p8.
++ */
++&i2c13 {
++	clock-frequency = <400000>;
++
++	status = "okay";
++
++	touchscreen@4b {
++		compatible = "syna,s3908";
++		reg = <0x4b>;
++		interrupts-extended = <&tlmm 39 IRQ_TYPE_LEVEL_LOW>;
++		reset-gpios = <&tlmm 38 GPIO_ACTIVE_LOW>;
++		vdd-supply = <&vreg_l11c_3p0>;
++		avdd-supply = <&vreg_l1c_1p8>;	/* the synaptics_tcm_i2c binding calls the 1.8 V rail avdd (old driver: vcc) */
++		wakeup-source;
++		pinctrl-0 = <&ts_int_default>;
++		pinctrl-1 = <&ts_rst_suspend>;
++		pinctrl-names = "default";
++	};
++};

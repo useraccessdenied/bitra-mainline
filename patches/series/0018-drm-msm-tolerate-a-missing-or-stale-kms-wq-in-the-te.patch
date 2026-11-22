@@ -1,0 +1,48 @@
+From 136edf1505bb7221b7070979f3f755086eba4680 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 14:25:25 +0530
+Subject: [PATCH 18/22] drm/msm: tolerate a missing or stale kms->wq in the
+ teardown path
+
+msm_kms_init() allocates kms->wq; msm_kms_destroy() freed it without clearing the pointer, and struct msm_kms survives
+unbind/bind. If the next bring-up fails before msm_kms_init() (or msm_kms_init() itself fails to allocate), the error path
+msm_drm_kms_uninit() flushed a freed/NULL workqueue: KASAN null-ptr-deref in touch_wq_lockdep_map, found as the last point
+of a fail-nth sweep (N=752).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/msm_kms.c | 3 ++-
+ drivers/gpu/drm/msm/msm_kms.h | 6 +++++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_kms.c b/drivers/gpu/drm/msm/msm_kms.c
+index da7c9e3cd..81056c9cd 100644
+--- a/drivers/gpu/drm/msm/msm_kms.c
++++ b/drivers/gpu/drm/msm/msm_kms.c
+@@ -242,7 +242,8 @@ void msm_drm_kms_uninit(struct device *dev)
+ 	 * irq after uninstall has disabled it.
+ 	 */
+ 
+-	flush_workqueue(kms->wq);
++	if (kms->wq)
++		flush_workqueue(kms->wq);
+ 
+ 	/*
+ 	 * The self-refresh helper's delayed entry work takes a reference on the
+diff --git a/drivers/gpu/drm/msm/msm_kms.h b/drivers/gpu/drm/msm/msm_kms.h
+index f25b31e50..7c52eac2b 100644
+--- a/drivers/gpu/drm/msm/msm_kms.h
++++ b/drivers/gpu/drm/msm/msm_kms.h
+@@ -203,7 +203,11 @@ static inline void msm_kms_destroy(struct msm_kms *kms)
+ 	for (i = 0; i < ARRAY_SIZE(kms->pending_timers); i++)
+ 		msm_atomic_destroy_pending_timer(&kms->pending_timers[i]);
+ 
+-	destroy_workqueue(kms->wq);
++	/* struct msm_kms outlives the DRM device: do not leave a dangling pointer for the next bring-up's error path */
++	if (kms->wq) {
++		destroy_workqueue(kms->wq);
++		kms->wq = NULL;
++	}
+ }
+ 
+ #define for_each_crtc_mask(dev, crtc, crtc_mask) \

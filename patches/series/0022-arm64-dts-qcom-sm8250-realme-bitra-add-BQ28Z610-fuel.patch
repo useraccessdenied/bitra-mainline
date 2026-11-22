@@ -1,0 +1,45 @@
+From dac11722c7ac2e585ecd667e36f93aef9a5be9a1 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 12:42:42 +0530
+Subject: [PATCH 22/22] arm64: dts: qcom: sm8250-realme-bitra: add BQ28Z610
+ fuel gauge, drop kasan_multi_shot from bootargs
+
+The gauge sits on i2c16 (0x888000) like on the OnePlus 8T; read-only
+(charge level, voltage, current, temperature, cycle count).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 7a8ceefea..6a8429556 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -34,7 +34,7 @@ memory {
+ / {
+ 	chosen {
+ 		/* ABL rewrites this in place; it refuses trees whose /chosen has no bootargs */
+-		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7 kasan_multi_shot";
++		bootargs = "rcupdate.rcu_expedited=1 rcu_nocbs=0-7";
+ 	};
+ };
+ 
+@@ -129,3 +129,17 @@ touchscreen@4b {
+ 		pinctrl-names = "default";
+ 	};
+ };
++
++/*
++ * Fuel gauge: TI BQ28Z610 on i2c16 (se16, 0x888000; the stock node is "oplus,bq27541-battery" with qcom,batt_bq28z610), same as the
++ * OnePlus 8T. Read-only: charge level, voltage, current, temperature. The charger itself (MP2650 on i2c5, Oplus charge pump,
++ * RK826 VOOC MCU on i2c16, SMB1390 on i2c15) has no mainline driver and is not touched; see docs/26-battery-charger.md.
++ */
++&i2c16 {
++	status = "okay";
++
++	fuel_gauge: fuel-gauge@55 {
++		compatible = "ti,bq28z610";
++		reg = <0x55>;
++	};
++};

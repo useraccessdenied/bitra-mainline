@@ -1,0 +1,30 @@
+From c4b257f83f3b53476d9d0d1a9ae0983af5401a16 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 02:39:57 +0530
+Subject: [PATCH 06/22] bitra DTS: temporary local-bd-address for the QCA6390
+ Bluetooth controller
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+index 4cf0ffcd0..8778e00a4 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
++++ b/arch/arm64/boot/dts/qcom/sm8250-realme-bitra.dts
+@@ -97,3 +97,14 @@ &qca6390_pmu {
+ 	vddpmu-supply = <&vreg_s6a_0p95>;
+ 	vddrfa0p95-supply = <&vreg_s6a_0p95>;
+ };
++
++/*
++ * The QCA6390 comes up with the placeholder address 00:00:00:00:5a:ad, which the kernel treats as "unconfigured".
++ * Android keeps the real address in vendor storage (persist); until that is read, use a locally administered one.
++ * TEMPORARY: replace with the address read from persist (or generated once and stored).
++ */
++&uart6 {
++	bluetooth {
++		local-bd-address = [ ad 5a 05 7a b1 02 ];	/* 02:b1:7a:05:5a:ad, stored little-endian */
++	};
++};

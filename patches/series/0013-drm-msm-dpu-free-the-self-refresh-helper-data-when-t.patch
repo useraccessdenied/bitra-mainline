@@ -1,0 +1,49 @@
+From fba17282e19f93f4c6b2080e4fcee785173da189 Mon Sep 17 00:00:00 2001
+From: useraccessdenied <useraccessdenied@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 04:08:34 +0530
+Subject: [PATCH 13/22] drm/msm/dpu: free the self-refresh helper data when the
+ DRM device goes away
+
+dpu_crtc_init() calls drm_self_refresh_helper_init() but nothing called drm_self_refresh_helper_cleanup(), leaking one 512-byte drm_self_refresh_data per CRTC every time the DRM device is torn down and brought up again (panel/DSI unbind + bind). kmemleak after 50 bring-ups: 100 objects, all from drm_self_refresh_helper_init <- dpu_crtc_init <- dpu_kms_hw_init. Release it with a drmm action registered after the CRTC's own managed cleanup.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c
+index 42d0a529b..8ba3e583a 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_crtc.c
+@@ -15,6 +15,7 @@
+ #include <drm/drm_atomic.h>
+ #include <drm/drm_blend.h>
+ #include <drm/drm_crtc.h>
++#include <drm/drm_managed.h>
+ #include <drm/drm_flip_work.h>
+ #include <drm/drm_framebuffer.h>
+ #include <drm/drm_mode.h>
+@@ -1875,6 +1876,11 @@ static const struct drm_crtc_helper_funcs dpu_crtc_helper_funcs = {
+  *
+  * initialize CRTC
+  */
++static void dpu_crtc_self_refresh_cleanup(struct drm_device *dev, void *ptr)
++{
++	drm_self_refresh_helper_cleanup(ptr);
++}
++
+ struct drm_crtc *dpu_crtc_init(struct drm_device *dev, struct drm_plane *plane,
+ 				struct drm_plane *cursor)
+ {
+@@ -1936,6 +1942,11 @@ struct drm_crtc *dpu_crtc_init(struct drm_device *dev, struct drm_plane *plane,
+ 		return ERR_PTR(ret);
+ 	}
+ 
++	/* The helper's data is never freed otherwise: 512 bytes leaked per CRTC on every DRM device teardown */
++	ret = drmm_add_action_or_reset(crtc->dev, dpu_crtc_self_refresh_cleanup, crtc);
++	if (ret)
++		return ERR_PTR(ret);
++
+ 	DRM_DEBUG_KMS("%s: successfully initialized crtc\n", dpu_crtc->name);
+ 	return crtc;
+ }
