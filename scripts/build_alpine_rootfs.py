@@ -373,8 +373,8 @@ def inner(a):
     if (stock / "v-extract/vendor/etc/sensors/sns_reg_config").exists():
         put(f"{qroot}/sensors/sns_reg.conf", (stock / "v-extract/vendor/etc/sensors/sns_reg_config").read_bytes())
     (root / qroot / "sensors/registry/registry").mkdir(parents=True, exist_ok=True)
-    # platform identity the SSC config selection reads from /sys/devices/soc0 (mainline's socinfo lacks hw_platform & co.); hw_platform MTP + soc_id 356 match the IMU/hall/SAR configs
-    for name, val in (("hw_platform", "MTP"), ("platform_subtype", "Unknown"), ("platform_subtype_id", "0"), ("platform_version", "65536"),
+    # platform identity the SSC config selection reads from /sys/devices/soc0 (mainline's socinfo lacks hw_platform & co.); hw_platform QRD + platform_version 65536 select the TMD2725 proximity/ALS config (the stock configs of this product are named kona_qrd_*), soc_id 356
+    for name, val in (("hw_platform", "QRD"), ("platform_subtype", "Unknown"), ("platform_subtype_id", "0"), ("platform_version", "65536"),
                       ("soc_id", "356"), ("revision", "2.1")):
         put(f"{qroot}/socinfo/{name}", val + "\n")
     # the stock sensor registry (tools/extract-sensor-registry.py from the owner's persist backup; device specific, gitignored): without it SSC enumerates no sensors
