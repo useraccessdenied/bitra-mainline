@@ -86,3 +86,18 @@ image yet (the 2.5 GB system image from the IPSW must come from somewhere other 
 (not published: it holds Apple's files). It cannot travel in the fastboot boot image (2.4 GB); HakiOS sends it over USB (`xl ramdisk`), which bitra lacks.
 Plan: put it in unused space of `userdata` (past the Alpine ext4; only `userdata`/`boot` may be written) and read it through the UFS driver (`ufs=2`).
 Logs: the loader dumps the whole kernel log at once; `pages=N` among the payload's arguments shows it in N-second pages. Mu's `PcdFrameBufferDelay` is 0 again.
+
+## `darwin` partition created, system image written (2026-11-24)
+- Owner approved a GPT edit on the UFS LUN that also holds the firmware partitions (safeguards below) to give HakiOS a dedicated partition.
+- Before: `userdata` = sda11, 59,094,515 x 4 KiB sectors (ext4 filled all of it, 1.85 GB used). Backups in `backups/gpt-20261124/`
+  (primary and backup GPT sectors, `sfdisk -d`, original LBA 0; the rootfs tarball, sha256 2c4b4b18..., stayed on the build host).
+- Steps: RAM-booted the initramfs without `bitra.root` (image `d-1`), copied e2fsck/resize2fs/sfdisk plus musl libs from the rootfs into RAM, `e2fsck -f`,
+  `resize2fs /dev/sda11 16777216` (64 GiB), then `sfdisk --no-reread` with a script that changes only sda11's size and adds
+  `sda12 : start=19460616 size=16777216 name="darwin"` (type Linux data). sfdisk also rewrote the protective MBR (LBA 0); the original sector was restored with dd.
+- Verified: entries 1-10 and the unchanged header fields byte-identical to the backup; only the two header CRCs, entry 11 and the new entry 12 differ.
+  About 113 GiB at the end of the LUN is left unallocated.
+- `scripts/write_darwin_part.py` writes an image to sda12 in 64 MiB chunks (stage, put, sha256 on the phone, dd), then reads the whole range back.
+  A single `put` of the 2.4 GB file timed out (0 bytes arrived); 64 MiB chunks take about 4 s each.
+- `system.apfs` (2,475,704,320 bytes, sha256 a70a25e6f589913ded1a39111687a0c55d526cc725de1d846f2dd11dadd6677d) is on sda12; readback hash matches, also after a reboot.
+  Alpine boots from the shrunk `userdata` (63 GB, 2.5 GB used).
+- Next: boot HakiOS with `ufs=2`/darwin root; the HakiOS UFS driver on the SM8250 controller is untested.

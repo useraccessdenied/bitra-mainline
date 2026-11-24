@@ -1,0 +1,21 @@
+label: gpt
+label-id: D174B796-F53A-3695-675C-4F561E4D52F1
+device: /dev/sda
+unit: sectors
+first-lba: 6
+last-lba: 61777914
+table-length: 32
+sector-size: 4096
+
+/dev/sda1 : start=           6, size=           2, type=2C86E742-745E-4FDD-BFD8-B6A7AC638772, uuid=2CDC9A7B-BB2F-2964-83F0-625E0BE07411, name="ssd"
+/dev/sda2 : start=           8, size=        8192, type=6C95E238-E343-4BA8-B489-8681ED22AD0B, uuid=715873A9-A288-81E3-1ADC-2E116A987C85, name="persist"
+/dev/sda3 : start=        8200, size=         256, type=82ACC91F-357C-4A68-9C8F-689E1B1A23A1, uuid=EDB968D7-D449-3533-B312-C3A86198975E, name="misc"
+/dev/sda4 : start=        8456, size=         128, type=DE7D4029-0F5B-41C8-AE7E-F6C023A02B33, uuid=A294BA02-3FA9-616A-E0A2-5A633293BE28, name="keystore"
+/dev/sda5 : start=        8584, size=         128, type=91B72D4D-71E0-4CBF-9B8E-236381CFF17A, uuid=EDFF4D4F-3D45-69FF-A524-044A60ACA514, name="frp"
+/dev/sda6 : start=        8712, size=      114688, type=5594C694-C871-4B5F-90B1-690A6F68E0F7, uuid=6FE10AF9-9C12-9F9F-1AE3-E0E3793CF265, name="cache"
+/dev/sda7 : start=      123400, size=        4096, type=988A98C9-2910-4123-AAEC-1CF6B1BC28F9, uuid=29EF95DA-2AE2-4A60-8CB6-3D406FE94A44, name="metadata"
+/dev/sda8 : start=      127496, size=       32768, type=C5F681CC-9742-4641-BE4E-976EEB638EEE, uuid=FC07EEDE-4E97-FCCA-9015-CF9460094E71, name="vm-system"
+/dev/sda9 : start=      160264, size=       32768, type=66C9B323-F7FC-48B6-BF96-6F32E335A428, uuid=9B052FDB-77EA-C204-5243-6C4636E80C0E, name="rawdump"
+/dev/sda10 : start=      193032, size=     2490368, type=89A12DE1-5E41-4CB3-8B4C-B1441EB5DA38, uuid=909009B2-08AC-DEFC-D84A-5994D4968284, name="super"
+/dev/sda11 : start=     2683400, size=    16777216, type=1B81E7E6-F50D-419B-A739-2AEEF8DA3335, uuid=B5B8A80A-4E9A-E45D-56C4-EFF61AFCF462, name="userdata"
+/dev/sda12 : start=    19460616, size=    16777216, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, uuid=67C345FF-E75C-4C59-B214-BC870D80A522, name="darwin"
