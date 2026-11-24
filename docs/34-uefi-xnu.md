@@ -79,3 +79,10 @@ so images sent later seemed to change nothing: the loader now takes the shim's m
 boot-args when `rd=md0` / ramdisk entries are present (`mkbitrapayload.py` puts small entries first and pads the end).
 Not working / open: display is the loader's text only (XNU draws 1125x2436 on the 1080x2400 panel), `cpus=1`, no storage/touch, no Darwin userland
 image yet (the 2.5 GB system image from the IPSW must come from somewhere other than the boot image: UFS or the Alpine partition).
+
+### System image built (2026-11-24)
+`sysimage/unpack.sh` on the owner's iPhone10,3/10,6 16.5 20F66 IPSW (Apple files stay in `hakios-src/garnet/sysimage`, outside the repos), then
+`PREBUILT=1 REST=1 SYSTEM=1 userland/build.sh`: `userland/system.apfs`, 2,475,704,320 bytes, sha256 a70a25e6f589913ded1a39111687a0c55d526cc725de1d846f2dd11dadd6677d
+(not published: it holds Apple's files). It cannot travel in the fastboot boot image (2.4 GB); HakiOS sends it over USB (`xl ramdisk`), which bitra lacks.
+Plan: put it in unused space of `userdata` (past the Alpine ext4; only `userdata`/`boot` may be written) and read it through the UFS driver (`ufs=2`).
+Logs: the loader dumps the whole kernel log at once; `pages=N` among the payload's arguments shows it in N-second pages. Mu's `PcdFrameBufferDelay` is 0 again.

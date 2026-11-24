@@ -12,7 +12,7 @@ index 2d35c83..e7f75cf 100644
  
  enum { EfiLoaderData = 2, EfiConventionalMemory = 7 };
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..b016d80 100644
+index 735b9d0..073a287 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
 @@ -347,6 +347,68 @@ static int hc_log_skips;                /* logs not written this run (said twice
@@ -27,7 +27,7 @@ index 735b9d0..b016d80 100644
 + */
 +#define PAGE_LINES 60
 +#define PAGE_COLS 100
-+#define PAGE_SECS 20
++static uint64_t log_page_secs;              /* pages=N among the payload's arguments: N seconds a page; 0: the whole log at once */
 +#define PAGES_HEAD 3
 +#define PAGES_TAIL 5
 +
@@ -55,7 +55,7 @@ index 735b9d0..b016d80 100644
 +		i++;
 +		put_char('\n');
 +	}
-+	BS->stall((uint64_t)PAGE_SECS * 1000000ULL);
++	BS->stall(log_page_secs * 1000000ULL);
 +}
 +
 +static void
@@ -84,7 +84,7 @@ index 735b9d0..b016d80 100644
  static void
  write_logs(const char *klog, uint64_t klog_len)
  {
-@@ -355,12 +417,18 @@ write_logs(const char *klog, uint64_t klog_len)
+@@ -355,12 +417,28 @@ write_logs(const char *klog, uint64_t klog_len)
  	compose_logs(klog, klog_len);
  	if (bio == NULL) {
  		/* No log partition (QEMU): echo the returned kernel log on the console instead. */
@@ -92,14 +92,24 @@ index 735b9d0..b016d80 100644
 -			print("\n== KERNEL LOG ==\n");
 -			for (uint64_t i = 0; i < klog_len; i++) {
 -				put_char(klog[i]);
++		if (log_page_secs == 0) {
++			if (klog != NULL) {
++				print("\n== KERNEL LOG ==\n");
++				for (uint64_t i = 0; i < klog_len; i++) {
++					put_char(klog[i]);
++				}
++				print("\n== END OF LOG ==\n");
+ 			}
+-			print("\n== END OF LOG ==\n");
++			return;
++		}
 +		{
 +			static char loader_copy[8192];
 +			uint64_t n = log_len < sizeof(loader_copy) ? log_len : sizeof(loader_copy);
 +
 +			for (uint64_t i = 0; i < n; i++) {
 +				loader_copy[i] = log_buf[i];
- 			}
--			print("\n== END OF LOG ==\n");
++			}
 +			show_log_page(loader_copy, n, 0, 1, 2, "LOADER");
 +			show_log_page(loader_copy, n, PAGE_LINES, 2, 2, "LOADER");
 +		}
@@ -108,7 +118,7 @@ index 735b9d0..b016d80 100644
  		}
  		return;
  	}
-@@ -591,6 +659,15 @@ static const struct platform platform_redwood = {
+@@ -591,6 +669,15 @@ static const struct platform platform_redwood = {
  	.small_cores = 0x0f,
  };
  
@@ -124,7 +134,20 @@ index 735b9d0..b016d80 100644
  static const struct platform platform_garnet = {
  	/* io_base must be non-zero: XNU treats a zero SoC base as "no SoC" and skips clock setup. */
  	.name = "garnet", .io_base = 0x00400000, .io_size = 0x1B000000,
-@@ -4295,6 +4372,49 @@ ramfb_phone_screen(void)
+@@ -3111,6 +3198,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+ 		}
+ 	}
+ 	for (const char *c = pi.cmdline; *c; c++) {
++		if (starts_with(c, "pages=") && (c == pi.cmdline || c[-1] == ' ')) {
++			log_page_secs = 0;
++			for (const char *d = c + 6; *d >= '0' && *d <= '9'; d++) {
++				log_page_secs = log_page_secs * 10 + (uint64_t)(*d - '0');
++			}
++		}
+ 		if (starts_with(c, "loader_return_after=")) {
+ 			for (c += 20; *c >= '0' && *c <= '9'; c++) {
+ 				kernel_budget = kernel_budget * 10 + (uint64_t)(*c - '0');
+@@ -4295,6 +4388,49 @@ ramfb_phone_screen(void)
   * Only the kernel and a root image that fits in the payload come this way; the big Darwin system image does not
   * (docs/uefi-boot.md says what does).
   */
@@ -174,7 +197,7 @@ index 735b9d0..b016d80 100644
  static uint64_t volume_payload_bytes;           /* 0: nothing was read; else the payload's size */
  static const char *volume_payload_note;         /* why not, if it was looked for */
  
-@@ -4437,11 +4557,16 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4437,11 +4573,16 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	BS->set_watchdog_timer(0, 0, 0, NULL);
  	/* no payload in memory (nobody put one there): the volume this loader came from may have one, as a UEFI boot loader's does */
@@ -191,7 +214,7 @@ index 735b9d0..b016d80 100644
  	if (volume_payload_bytes != 0) {
  		print("payload: %d bytes from \\EFI\\hakios\\payload.bin on the volume this loader was started from\n",
  		    volume_payload_bytes);
-@@ -4462,6 +4587,8 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4462,6 +4603,8 @@ efi_main(efi_handle image, efi_system_table *st)
  		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
  		if (SCREEN.base == 0xE1000000ULL) {
  			PLAT = &platform_redwood;
