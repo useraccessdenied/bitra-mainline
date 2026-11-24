@@ -15,12 +15,16 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--payload', required=True)
 ap.add_argument('--mode', default='DEBUG')
 ap.add_argument('-o', '--output', required=True)
+ap.add_argument('--gz', action='store_true', help='carry the payload gzip-compressed (the loader inflates it): the firmware delivers only ~12.5 MiB of the decompressed boot image intact')
 a = ap.parse_args()
 
 fd = open(f'{MU}/Build/bitraPkg/{a.mode}_CLANGPDB/FV/SILICIUM_UEFI.fd', 'rb').read()
 assert len(fd) == FD_SIZE
 pay = open(a.payload, 'rb').read()
 assert pay[:4] == b'XNUP' and len(pay) <= PAYLOAD_MAX
+if a.gz:
+    import gzip as _gz
+    pay = _gz.compress(pay, 9, mtime=0)
 pay += b'\0' * (-len(pay) % 16)
 with tempfile.TemporaryDirectory() as t:
     env = dict(os.environ, PATH=CLANG + ':' + os.environ['PATH'])
@@ -32,5 +36,8 @@ with tempfile.TemporaryDirectory() as t:
     dtb = open(f'{MU}/Resources/DTBs/bitra.dtb', 'rb').read()
     open(t + '/k', 'wb').write(gzip.compress(blob, 6) + dtb)
     subprocess.check_call([sys.executable, f'{MU}/Resources/Scripts/mkbootimg.py', '--kernel', t + '/k',
-                           '--ramdisk', f'{MU}/Resources/ramdisk', '--header_version', '1', '-o', a.output])
+                           '--ramdisk', f'{MU}/Resources/ramdisk', '--header_version', '1',
+                           # ABL puts the ramdisk at kernel + (ramdisk_addr - kernel_addr); the default 16 MiB gap lands inside a big
+                           # payload (it destroyed everything past 12.5 MiB of it), so put the ramdisk 64 MiB above the kernel
+                           '--ramdisk_offset', '0x4000000', '-o', a.output])
 print(a.output, os.path.getsize(a.output), 'bytes; payload', len(pay))

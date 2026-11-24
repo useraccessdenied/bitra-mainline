@@ -101,3 +101,21 @@ Logs: the loader dumps the whole kernel log at once; `pages=N` among the payload
 - `system.apfs` (2,475,704,320 bytes, sha256 a70a25e6f589913ded1a39111687a0c55d526cc725de1d846f2dd11dadd6677d) is on sda12; readback hash matches, also after a reboot.
   Alpine boots from the shrunk `userdata` (63 GB, 2.5 GB used).
 - Next: boot HakiOS with `ufs=2`/darwin root; the HakiOS UFS driver on the SM8250 controller is untested.
+
+## Boot-image payload limit, gzip payload, storage blocker (2026-11-24, night)
+- **Only about 12.5 MiB of the decompressed boot image reach RAM intact.** Per-MiB checksums printed by the loader (payload at 0xA03800A0)
+  matched the host for MiB 0-11, MiB 12 was partly wrong and MiB 13-18 read as zeros (the loader is loaded at 0xA1000000, 12.5 MiB into
+  the image; moving the ramdisk with `--ramdisk_offset 0x4000000` changed nothing). The earlier "15 MB payload copy hangs", the loop
+  "kernel resets right after `jumping to`" and the failures of the 20-24 MB flash-root images all come from this: the tail of the kernel file was missing.
+  The 16 MB image of the first working boot only lost the unused end of the kernel file.
+- **Fix:** `mkbitraimg.py --gz` carries the payload gzip-compressed (20.2 MB -> 5.5 MB); the loader (`gunzip()` in `loader.c`, a small
+  freestanding inflate) inflates it into the payload region and checks CRC-32 and size (`bitra: inflated ... CRC ok`). Verified: the flash-root
+  payload (real `flashboot.apfs` boot volume, `stage0` as launchd) runs and the kernel halts at the end, then the phone returns to Alpine.
+- **APSS watchdog:** read at start (`en=0 sts=0 bark=7ffff bite=fffff`): the bootloaders leave it disabled, so it was not the cause of the resets.
+- **No UFS block device in Mu's UEFI:** `ufs: connect: 157 handles, 3 connected`, no BlockIo, no PartitionInfo. `UFSDxe` (Qualcomm binary from
+  the phone's firmware) is in the DXE list but exposes nothing, so the loader cannot serve `darwin` (`ufs=2` needs it). Next: read why from Mu's
+  in-RAM debug log (`fwlog:` lines, loader scans 0x9FFF7000), then either fix the UEFI side or use the kernel's own UFS host controller driver (`ufs_native=`).
+- **`darwin` partition now holds Apple's layout** (`rootfs.apfs` + both cryptexes back to back, 8,365,539,328 bytes, sha256 9efb156f...; the piece hashes match
+  the HakiOS documentation 9f430a58 / 2279bf44 / 6b9d1f09). Its type GUID is still the Linux data type (a write path would need APFS container type 7C3457EF-0000-11AA-AA11-00306543ECAC;
+  reads do not check it). The RAM side: `flashboot.apfs` (4 MB boot volume, `CRYPTEXES=flash FLASHBOOT=1 PREBUILT=1`) as `resident`, `root.apfs` as `ramdisk`.
+- Test images are kept in `releases/` (gitignored): `xnu-bitra-H.img` has 10 s pauses in the loader (after the firmware-log lines and before the jump).

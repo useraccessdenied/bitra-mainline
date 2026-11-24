@@ -1,3 +1,15 @@
+diff --git a/Binaries b/Binaries
+--- a/Binaries
++++ b/Binaries
+@@ -1 +1 @@
+-Subproject commit f878f9911485d606060a08c098f25e8dd0de1324
++Subproject commit f878f9911485d606060a08c098f25e8dd0de1324-dirty
+diff --git a/Mu_Basecore b/Mu_Basecore
+--- a/Mu_Basecore
++++ b/Mu_Basecore
+@@ -1 +1 @@
+-Subproject commit c96049e1353260dadb7477a5ab70dec868db6c65
++Subproject commit c96049e1353260dadb7477a5ab70dec868db6c65-dirty
 diff --git a/Platforms/Realme/bitraPkg/Include/RAW.inc b/Platforms/Realme/bitraPkg/Include/RAW.inc
 index a34b903..f353c98 100644
 --- a/Platforms/Realme/bitraPkg/Include/RAW.inc
@@ -26,20 +38,17 @@ index 526139a..e18c4c9 100644
    {"SecurityFlag", 0xC4},
    {"EnableLogFsSyncInRetail", 0x0},
 diff --git a/Platforms/Realme/bitraPkg/bitra.dsc b/Platforms/Realme/bitraPkg/bitra.dsc
-index bae6bc7..5858c06 100644
+index bae6bc7..9859115 100644
 --- a/Platforms/Realme/bitraPkg/bitra.dsc
 +++ b/Platforms/Realme/bitraPkg/bitra.dsc
 @@ -61,6 +61,7 @@
    gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1080
    gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|2400
    gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|32
-+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferDelay|10000
++  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferDelay|0
  
    #
    # Platform PEI
-diff --git a/Platforms/Realme/bitraPkg/hakios/loader.efi b/Platforms/Realme/bitraPkg/hakios/loader.efi
-new file mode 100755
-index 0000000..c9a0eb9
 diff --git a/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c b/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c
 index 3a0a8a2..23ee590 100644
 --- a/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c
