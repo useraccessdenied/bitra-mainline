@@ -68,3 +68,14 @@ Payload delivery: a 15 MB copy by the boot shim with the MMU off never finished 
 different destinations isolated it). The shim (`uefi/hakios-bitra/BootShim-payload.S`) now only leaves a mailbox at 0x9FEFF000 (FD tail) and the loader
 copies the payload with caches on (`loader-bitra.patch`). Also fixed: a literal pool after the `_Payload` label shifted the FD copy.
 Build: `uefi/hakios-bitra/mkbitraimg.py --payload payload.bin -o img` (payload from `xnuloader/mkpayload.py kernel=... ramdisk=...`).
+
+### Userland runs (2026-11-24, later)
+Kernel log pages (loader shows its own log and the kernel's log in 20 s pages after the run, `show_log_pages` in `loader-bitra.patch`, since the
+kernel's console and UEFI's overdraw each other) show a complete boot: `Added memory device md0/rmd0`, `BSD root: md0`, `bsd_init: done`,
+`load_init_program: attempting to load /sbin/launchd`, then `pid 1 exited (exit 0)` and the panic `initproc failed to start` - which is what the
+test program `hello` (the root image) does by design. So the iOS 16.5 kernel runs on the SM8250 and executes a Darwin process.
+Two bugs found on the way: (1) RAM keeps the previous run's payload across the warm reset and the loader reused it (its magic was still there),
+so images sent later seemed to change nothing: the loader now takes the shim's mailbox first; (2) the kernel only gets its root image and
+boot-args when `rd=md0` / ramdisk entries are present (`mkbitrapayload.py` puts small entries first and pads the end).
+Not working / open: display is the loader's text only (XNU draws 1125x2436 on the 1080x2400 panel), `cpus=1`, no storage/touch, no Darwin userland
+image yet (the 2.5 GB system image from the IPSW must come from somewhere other than the boot image: UFS or the Alpine partition).

@@ -1,8 +1,114 @@
+diff --git a/xnuloader/efi.h b/xnuloader/efi.h
+index 2d35c83..e7f75cf 100644
+--- a/xnuloader/efi.h
++++ b/xnuloader/efi.h
+@@ -30,6 +30,8 @@ struct efi_text_output;
+ typedef struct efi_text_output {
+ 	void *reset;
+ 	efi_status (EFIAPI *output_string)(struct efi_text_output *self, const char16 *str);
++	void *test_string, *query_mode, *set_mode, *set_attribute;
++	efi_status (EFIAPI *clear_screen)(struct efi_text_output *self);
+ } efi_text_output;
+ 
+ enum { EfiLoaderData = 2, EfiConventionalMemory = 7 };
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..933afe9 100644
+index 735b9d0..b016d80 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
-@@ -591,6 +591,15 @@ static const struct platform platform_redwood = {
+@@ -347,6 +347,68 @@ static int hc_log_skips;                /* logs not written this run (said twice
+ static void hc_print_state(const char *when);
+ static void hc_take_back(const char *when);
+ 
++/*
++ * bitra: no log partition and no USB, so the kernel's log is shown on the panel in pages (the kernel's own console and
++ * UEFI's overdraw each other while it runs): the first PAGES_HEAD pages, then the last PAGES_TAIL, each cut to
++ * 100 characters a line, PAGE_LINES lines a page, PAGE_SECS seconds each, so that they can be photographed.
++ * The whole log is also printed to the loader's own log buffer (put_char), nothing is lost.
++ */
++#define PAGE_LINES 60
++#define PAGE_COLS 100
++#define PAGE_SECS 20
++#define PAGES_HEAD 3
++#define PAGES_TAIL 5
++
++static void
++show_log_page(const char *log, uint64_t len, uint64_t first_line, uint64_t page, uint64_t pages, const char *what)
++{
++	uint64_t line = 0, i = 0;
++
++	ST->con_out->clear_screen(ST->con_out);
++	print("== %s page %d of %d, kernel log lines from %d ==\n", what, page, pages, first_line);
++	while (i < len && line < first_line) {
++		if (log[i++] == '\n') {
++			line++;
++		}
++	}
++	for (uint64_t n = 0; n < PAGE_LINES && i < len; n++) {
++		uint64_t col = 0;
++
++		while (i < len && log[i] != '\n') {
++			if (col++ < PAGE_COLS && log[i] >= 32 && log[i] < 127) {
++				put_char(log[i]);
++			}
++			i++;
++		}
++		i++;
++		put_char('\n');
++	}
++	BS->stall((uint64_t)PAGE_SECS * 1000000ULL);
++}
++
++static void
++show_log_pages(const char *log, uint64_t len)
++{
++	uint64_t lines = 0;
++
++	for (uint64_t i = 0; i < len; i++) {
++		if (log[i] == '\n') {
++			lines++;
++		}
++	}
++	uint64_t total = (lines + PAGE_LINES - 1) / PAGE_LINES, tail_from = total > PAGES_HEAD + PAGES_TAIL ? total - PAGES_TAIL : PAGES_HEAD;
++
++	for (uint64_t p = 0; p < total && p < PAGES_HEAD; p++) {
++		show_log_page(log, len, p * PAGE_LINES, p + 1, total, "HEAD");
++	}
++	for (uint64_t p = tail_from; p < total; p++) {
++		show_log_page(log, len, p * PAGE_LINES, p + 1, total, "TAIL");
++	}
++	ST->con_out->clear_screen(ST->con_out);
++	print("kernel log: %d bytes, %d lines, %d pages shown, rebooting\n", len, lines, 0 + PAGES_HEAD + PAGES_TAIL);
++	BS->stall(10000000ULL);
++}
++
+ static void
+ write_logs(const char *klog, uint64_t klog_len)
+ {
+@@ -355,12 +417,18 @@ write_logs(const char *klog, uint64_t klog_len)
+ 	compose_logs(klog, klog_len);
+ 	if (bio == NULL) {
+ 		/* No log partition (QEMU): echo the returned kernel log on the console instead. */
+-		if (klog != NULL) {
+-			print("\n== KERNEL LOG ==\n");
+-			for (uint64_t i = 0; i < klog_len; i++) {
+-				put_char(klog[i]);
++		{
++			static char loader_copy[8192];
++			uint64_t n = log_len < sizeof(loader_copy) ? log_len : sizeof(loader_copy);
++
++			for (uint64_t i = 0; i < n; i++) {
++				loader_copy[i] = log_buf[i];
+ 			}
+-			print("\n== END OF LOG ==\n");
++			show_log_page(loader_copy, n, 0, 1, 2, "LOADER");
++			show_log_page(loader_copy, n, PAGE_LINES, 2, 2, "LOADER");
++		}
++		if (klog != NULL) {
++			show_log_pages(klog, klog_len);
+ 		}
+ 		return;
+ 	}
+@@ -591,6 +659,15 @@ static const struct platform platform_redwood = {
  	.small_cores = 0x0f,
  };
  
@@ -18,7 +124,7 @@ index 735b9d0..933afe9 100644
  static const struct platform platform_garnet = {
  	/* io_base must be non-zero: XNU treats a zero SoC base as "no SoC" and skips clock setup. */
  	.name = "garnet", .io_base = 0x00400000, .io_size = 0x1B000000,
-@@ -4295,6 +4304,44 @@ ramfb_phone_screen(void)
+@@ -4295,6 +4372,49 @@ ramfb_phone_screen(void)
   * Only the kernel and a root image that fits in the payload come this way; the big Darwin system image does not
   * (docs/uefi-boot.md says what does).
   */
@@ -51,6 +157,11 @@ index 735b9d0..933afe9 100644
 +		mailbox_note = "the payload region is not free";
 +		return 0;
 +	}
++	print("bitra: payload source %x size %x\n", src, size);
++	for (uint64_t k = 0; k <= size / 0x100000; k++) {
++		uint64_t off = k < size / 0x100000 ? k * 0x100000 : size - 8;
++		print("  @%x %x\n", off, *(const uint64_t *)(uintptr_t)(src + off));
++	}
 +	const uint64_t *from = (const uint64_t *)(uintptr_t)src;
 +	uint64_t *to = (uint64_t *)(uintptr_t)PAYLOAD_BASE;
 +	for (uint64_t i = 0; i < size / 8; i++) {
@@ -63,13 +174,12 @@ index 735b9d0..933afe9 100644
  static uint64_t volume_payload_bytes;           /* 0: nothing was read; else the payload's size */
  static const char *volume_payload_note;         /* why not, if it was looked for */
  
-@@ -4437,11 +4484,17 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4437,11 +4557,16 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	BS->set_watchdog_timer(0, 0, 0, NULL);
  	/* no payload in memory (nobody put one there): the volume this loader came from may have one, as a UEFI boot loader's does */
-+	if (((const struct payload_header *)PAYLOAD_BASE)->magic != PAYLOAD_MAGIC) {
-+		load_payload_from_mailbox();
-+	}
++	/* the mailbox first: RAM keeps the payload of the previous boot across a warm reset, and its magic is still there */
++	load_payload_from_mailbox();
  	if (((const struct payload_header *)PAYLOAD_BASE)->magic != PAYLOAD_MAGIC) {
  		load_payload_from_volume();
  	}
@@ -81,7 +191,7 @@ index 735b9d0..933afe9 100644
  	if (volume_payload_bytes != 0) {
  		print("payload: %d bytes from \\EFI\\hakios\\payload.bin on the volume this loader was started from\n",
  		    volume_payload_bytes);
-@@ -4462,6 +4515,8 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4462,6 +4587,8 @@ efi_main(efi_handle image, efi_system_table *st)
  		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
  		if (SCREEN.base == 0xE1000000ULL) {
  			PLAT = &platform_redwood;
