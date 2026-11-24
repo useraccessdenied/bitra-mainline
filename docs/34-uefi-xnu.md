@@ -55,3 +55,16 @@ Owner-supplied IPSW: `iPhone10,3,iPhone10,6_16.5_20F66_Restore.ipsw` (6.17 GB, B
 - `xnu-deps/setup.sh` then `./xnu-build.sh -j16 -k BUILD_DSYM=0` (dsymutil is not in the AOSP clang; the dSYM is optional). The build ends with the documented `check_all_exports` error; the kernel is linked.
 - Config: `devices/bitra/configs/bitra.config` leaves every phone driver out; `CONFIG_HAKIOS_ADRENO710=y` is built in only because HakiosGPU (always built) needs symbols from an Adreno driver (inert without `adreno=N`). Built in: adreno710 + virtio drivers; boot arg `ufs=2`.
 - Result: `hakios-kernel-bitra`, Mach-O arm64, 14.9 MB, `Darwin Kernel Version 22.5.0 ... xnu-8796.121.2`, sha256 `355dd2de...f907d5`. Untested: no payload image, no loader board entry for bitra, nothing booted.
+
+## First XNU boot on bitra (2026-11-24)
+
+The HakiOS loader (patched with a `bitra` platform: GICv3 0x17a00000/0x17a60000, selected by the framebuffer at 0x9c000000) starts the
+iOS 16.5 XNU kernel (xnu-8796.121.2) on the phone from `fastboot boot` + the Mu-Silicium boot menu entry "HackiOS" (press Vol-up at the Mu logo).
+Photographed on the panel: loader banner, `platform bitra`, `display 1080 x 2400 at 9c000000`, kernel mapped and entered (`jumping to fb41d4a8`),
+then the kernel's own verbose log (iBoot version, IONVRAM, `Security policy loaded: ... Seatbelt sandbox`). The kernel's text and UEFI's debug
+console draw over each other, so the screen is garbled. Not yet: root image (`hello`) result, anything past policy init, a clean log.
+
+Payload delivery: a 15 MB copy by the boot shim with the MMU off never finished (phone stuck on the fastboot logo; tests with 80 B, 15 MB zero,
+different destinations isolated it). The shim (`uefi/hakios-bitra/BootShim-payload.S`) now only leaves a mailbox at 0x9FEFF000 (FD tail) and the loader
+copies the payload with caches on (`loader-bitra.patch`). Also fixed: a literal pool after the `_Payload` label shifted the FD copy.
+Build: `uefi/hakios-bitra/mkbitraimg.py --payload payload.bin -o img` (payload from `xnuloader/mkpayload.py kernel=... ramdisk=...`).

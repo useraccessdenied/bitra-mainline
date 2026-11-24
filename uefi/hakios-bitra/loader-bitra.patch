@@ -1,0 +1,92 @@
+diff --git a/xnuloader/loader.c b/xnuloader/loader.c
+index 735b9d0..933afe9 100644
+--- a/xnuloader/loader.c
++++ b/xnuloader/loader.c
+@@ -591,6 +591,15 @@ static const struct platform platform_redwood = {
+ 	.small_cores = 0x0f,
+ };
+ 
++/* realme GT Neo 2 (SM8250-AC): GICv3 at 0x17a00000 / 0x17a60000, cores 0-3 Cortex-A55, 4-6 A77, 7 A77 prime; the
++ * panel's framebuffer is at 0x9C000000 (Mu-Silicium's "Display Reserved"). Generic memory window (largest free block). */
++static const struct platform platform_bitra = {
++	.name = "bitra", .io_base = 0x00400000, .io_size = 0x1B000000,
++	.gic_dist = 0x17A00000, .gic_redist = 0x17A60000, .uart = 0, .log_other_cpu = 1,
++	.cores = 8, .core_shift = 8,
++	.small_cores = 0x0f,
++};
++
+ static const struct platform platform_garnet = {
+ 	/* io_base must be non-zero: XNU treats a zero SoC base as "no SoC" and skips clock setup. */
+ 	.name = "garnet", .io_base = 0x00400000, .io_size = 0x1B000000,
+@@ -4295,6 +4304,44 @@ ramfb_phone_screen(void)
+  * Only the kernel and a root image that fits in the payload come this way; the big Darwin system image does not
+  * (docs/uefi-boot.md says what does).
+  */
++/*
++ * bitra: the boot shim leaves the payload where the firmware's boot image was decompressed (a 15 MB copy with the MMU
++ * off never finished) and says where in a mailbox in the unused tail of the UEFI FD: { "XNUPSRC!", source, size }.
++ * Copy it to PAYLOAD_BASE now, with the caches on. Returns 1 if a payload was taken.
++ */
++#define BITRA_MAILBOX 0x9FEFF000ULL
++static const char *mailbox_note;
++
++static int
++load_payload_from_mailbox(void)
++{
++	volatile uint64_t *mb = (volatile uint64_t *)BITRA_MAILBOX;
++	uint64_t src, size, address = PAYLOAD_BASE;
++
++	if (mb[0] != 0x2143525350554E58ULL) {           /* "XNUPSRC!" */
++		return 0;
++	}
++	src = mb[1];
++	size = mb[2];
++	mb[0] = 0;
++	if (size < sizeof(struct payload_header) || size > PAYLOAD_MAX_SIZE - 0x100000ULL ||
++	    ((const struct payload_header *)(uintptr_t)src)->magic != PAYLOAD_MAGIC) {
++		mailbox_note = "the shim's mailbox does not point at a payload";
++		return 0;
++	}
++	if (EFI_ERROR(BS->allocate_pages(2 /* AllocateAddress */, 2 /* EfiLoaderData */, PAYLOAD_MAX_SIZE / 0x1000, &address))) {
++		mailbox_note = "the payload region is not free";
++		return 0;
++	}
++	const uint64_t *from = (const uint64_t *)(uintptr_t)src;
++	uint64_t *to = (uint64_t *)(uintptr_t)PAYLOAD_BASE;
++	for (uint64_t i = 0; i < size / 8; i++) {
++		to[i] = from[i];
++	}
++	mailbox_note = "payload copied from the boot image";
++	return 1;
++}
++
+ static uint64_t volume_payload_bytes;           /* 0: nothing was read; else the payload's size */
+ static const char *volume_payload_note;         /* why not, if it was looked for */
+ 
+@@ -4437,11 +4484,17 @@ efi_main(efi_handle image, efi_system_table *st)
+ 
+ 	BS->set_watchdog_timer(0, 0, 0, NULL);
+ 	/* no payload in memory (nobody put one there): the volume this loader came from may have one, as a UEFI boot loader's does */
++	if (((const struct payload_header *)PAYLOAD_BASE)->magic != PAYLOAD_MAGIC) {
++		load_payload_from_mailbox();
++	}
+ 	if (((const struct payload_header *)PAYLOAD_BASE)->magic != PAYLOAD_MAGIC) {
+ 		load_payload_from_volume();
+ 	}
+ 	print("== XNULOADER v3 ==\n");
+ 	print_banner();
++	if (mailbox_note != NULL) {
++		print("bitra: %s\n", mailbox_note);
++	}
+ 	if (volume_payload_bytes != 0) {
+ 		print("payload: %d bytes from \\EFI\\hakios\\payload.bin on the volume this loader was started from\n",
+ 		    volume_payload_bytes);
+@@ -4462,6 +4515,8 @@ efi_main(efi_handle image, efi_system_table *st)
+ 		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
+ 		if (SCREEN.base == 0xE1000000ULL) {
+ 			PLAT = &platform_redwood;
++		} else if (SCREEN.base == 0x9C000000ULL) {
++			PLAT = &platform_bitra;
+ 		} else if (SCREEN.base == 0xB8000000ULL) {
+ 			PLAT = &platform_garnet;
+ 		} else {
