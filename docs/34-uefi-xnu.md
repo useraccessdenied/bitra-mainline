@@ -162,3 +162,14 @@ Also unknown: whether the controller's DMA (SMMU config) lets it reach the loade
   image memory (a3455000) is what resets the phone (XPU/SMMU), not a data buffer.
 - K = J with the list area in UEFI pages (`allocate_pages` BootServicesData; Qualcomm's UFSDxe keeps its list in its own pool).
   Still open if K also resets: the kernel's data buffers (`kmem_alloc_contig`, high RAM) and the core-7 start (I).
+
+## Post-mortem log in RAM, and where the reset is (2026-11-25, images L/M)
+- Photos were slow, so the kernel now mirrors its console into a 1 MiB ring at PA 0xf0000000 (loader reserves it with `allocate_pages`;
+  `pm_put`/`hakios_pm_map` in `osfmk/console/video_console.c`). After a reset Alpine reads it (`tools/xnulog`: `insmod xnulog.ko`,
+  `cat /proc/xnulog`; `echo > /proc/xnulog` zeroes it). Zero it and check it is all zeros before each run: then whatever is in it after
+  can only be from that run (an empty ring = the run never reached the kernel's console).
+- L (K + ring): log ends at `transfer list switched ... to this kernel's 99b26000` (list in UEFI pages): same reset as J/K.
+- M (`ufs_native=3`, dry run: switch in/out/in, no command): no reset; the kernel runs to init and the user-space tests
+  (19 of 23 checks pass; failing: the darwin mount [native reads off in this mode], the /private/var memory fs, a symlink, launchd.darwin).
+  So the controller restart with a different list is harmless; the reset comes with the first command (the proof's TEST UNIT READY
+  doorbell, i.e. the controller's first DMA fetch of this kernel's UTRD/UCD). Next: breadcrumbs around the doorbell (image N).
