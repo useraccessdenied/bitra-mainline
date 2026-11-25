@@ -666,22 +666,49 @@ synaptics_thread(__unused void *argument, __unused wait_result_t wait)
 
 	nanoseconds_to_absolutetime(10ULL * NSEC_PER_SEC, &every);
 	sleep_ms(3000);                         /* the rest of the boot first */
+	/*
+	 * Every step is said before it is made: a pin that the secure side protects resets the phone at the access (image AM: no
+	 * line at all reached the log), and the last line in the RAM ring then says which one.
+	 */
+	say("touch: mapping the pin controller at %lx\n", (unsigned long)TLMM_PHYS);
 	tlmm = ml_io_map(TLMM_PHYS, TLMM_SIZE);
-	/* the bus and the two other pins: the interrupt line an input with a pull-up, the reset let go (high) */
-	line(PIN_SDA, true);
-	line(PIN_SCL, true);
-	wr(GPIO_IO(PIN_INT), 0);
-	wr(GPIO_CFG(PIN_INT), CFG_PULL_UP);
-	drive(PIN_RESET, true);
+	say("touch: mapped; reading the four pins' configuration (read only)\n");
+	for (unsigned pin = 36; pin <= 39; pin++) {
+		say("touch: gpio%u: reading CFG\n", pin);
+		uint32_t cfg = rd(GPIO_CFG(pin));
+
+		say("touch: gpio%u: reading IO\n", pin);
+		uint32_t io = rd(GPIO_IO(pin));
+
+		say("touch: gpio%u: function %u, pull %u, %s, reads %u\n", pin, (cfg >> 2) & 15, cfg & 3, (cfg & CFG_OUTPUT) ? "output" : "input", io & 1);
+	}
+	/*
+	 * Image AN: writing the registers of gpio39 (the interrupt line) resets the phone, so nothing is written to it or to the reset line
+	 * (gpio38) unless the chip does not answer: the chip drives its interrupt line itself, and the level is read the same.
+	 */
+	say("touch: gpio%u (the interrupt line) and gpio%u (reset) are not written; reading only\n", PIN_INT, PIN_RESET);
+	say("touch: the bus lines: gpio%u IO, then CFG\n", PIN_SDA);
+	wr(GPIO_IO(PIN_SDA), 0);
+	say("touch: gpio%u IO written\n", PIN_SDA);
+	wr(GPIO_CFG(PIN_SDA), CFG_PULL_UP);
+	say("touch: gpio%u CFG written; gpio%u IO, then CFG\n", PIN_SDA, PIN_SCL);
+	wr(GPIO_IO(PIN_SCL), 0);
+	say("touch: gpio%u IO written\n", PIN_SCL);
+	wr(GPIO_CFG(PIN_SCL), CFG_PULL_UP);
+	say("touch: gpio%u CFG written: the bus is let go\n", PIN_SCL);
 	spin_us(50);
 	say("touch: SDA reads %u, SCL %u, INT %u; probing the chip at I2C address %02x\n", level(PIN_SDA), level(PIN_SCL),
 	    level(PIN_INT), I2C_ADDRESS);
 	if (!chip_setup()) {
 		/* once more after a reset of the chip, as the Linux driver starts it: reset low 10 ms, then 1 s to come up */
-		say("touch: resetting the chip\n");
-		drive(PIN_RESET, false);
+		say("touch: resetting the chip: gpio%u IO low, then CFG\n", PIN_RESET);
+		wr(GPIO_IO(PIN_RESET), 0);
+		say("touch: gpio%u IO written\n", PIN_RESET);
+		wr(GPIO_CFG(PIN_RESET), CFG_OUTPUT);
+		say("touch: gpio%u CFG written: reset asserted\n", PIN_RESET);
 		sleep_ms(10);
-		drive(PIN_RESET, true);
+		wr(GPIO_IO(PIN_RESET), 2);
+		say("touch: reset released\n");
 		sleep_ms(1000);
 		if (!chip_setup()) {
 			say("touch: no touch screen (are the chip's supplies on?)\n");

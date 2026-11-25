@@ -264,3 +264,9 @@ Image AL = AK with `cpus=8` (kernel on core 0, no `bootcpu`): the kernel registe
 `GenericARMPE: the slower cores started too: 8 processors running`, 45 checks 0 failed, 27 launchd services, and **the owner saw the iOS UI come up: SpringBoard home screen with the dialer and apps** (touch is not wired yet; the display geometry is the UEFI framebuffer 1080x2400
 under 1125x2436 surfaces). Kernel time to launchd dropped from ~50 s to ~30 s. At `loader_return_after` PSCI stops the other cores (`psci: cpu 6 ends the system`) and the boot processor returns to the loader.
 Log: 430 KB in the loader ring; the unimplemented-service noise is SpringBoard asking launchd for services the image does not have (sleepd, chronod, commcenter, biome, mobileactivationd ...).
+
+## Touch: the Synaptics S3908 driver (2026-11-26, images AM-AO)
+`drivers/input/hakios.synaptics.c` (copy in `uefi/hakios-bitra/`): I2C by hand on GPIO 36 (SDA) / 37 (SCL), address 0x4b, interrupt GPIO 39 (read as a level), reset GPIO 38; TouchComm v1 from the phone's own answers
+and the working Linux driver; samples go to `/dev/hakios-touch` as a fraction of the panel. Image AM (`touchscreen=1`) reset the phone ~2 s after launchd started with no `touch:` line; AN (a line before every access)
+stopped at `the interrupt line (gpio39) to an input with a pull-up`: **writing GPIO 39's registers resets the phone** (reading all of GPIOs 36-39 is fine: bootloader state is plain GPIO, no pull). The chip drives its interrupt line, so AO writes
+only the I2C pins, and GPIO 38 (reset) only if the chip does not answer, every register write logged first. Power of the chip's two PM8150C supplies is not switched by this driver (whatever the boot loader left).
