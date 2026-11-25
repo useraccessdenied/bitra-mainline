@@ -256,3 +256,5 @@ WRAPS (keeps the newest 8 MiB; `tools/xnulog/readring.py` unrolls a dump), the l
 - `loader_quiet=1` (image AJ): the loader skips its photograph pauses, writes the kernel's log into its own ring (now 4 MiB at 0xf0800000, `insmod xnulog.ko pa=0xf0800000 size=0x400000`) instead of drawing it, one summary line. The firmware's own on-screen logging
   is `DebugLib` through `FrameBufferSerialPortLib`; a DEBUG build prints (`PcdDebugPrintErrorLevel 0x8007EE0F`), a RELEASE build does not (level 0): image AK = AJ's payload with the RELEASE Mu (`EXTRA="-r RELEASE" sh uefi/mu-silicium-bitra/build.sh`,
   `mkbitraimg.py --mode RELEASE`); not yet run on the phone.
+- Image AK (RELEASE Mu, `loader_quiet=1`, `vcquiet=1`; 2026-11-26): runs like the DEBUG images (23 services spawned, `kernel log: 280092 bytes, in the loader ring at f0800000`, phone back in Alpine by itself). Mu prints nothing; the `fwlog:` lines in the loader ring are
+  Mu's log buffer text left from earlier boots (it keeps text across resets).
