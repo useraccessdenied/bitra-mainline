@@ -119,3 +119,26 @@ Logs: the loader dumps the whole kernel log at once; `pages=N` among the payload
   the HakiOS documentation 9f430a58 / 2279bf44 / 6b9d1f09). Its type GUID is still the Linux data type (a write path would need APFS container type 7C3457EF-0000-11AA-AA11-00306543ECAC;
   reads do not check it). The RAM side: `flashboot.apfs` (4 MB boot volume, `CRYPTEXES=flash FLASHBOOT=1 PREBUILT=1`) as `resident`, `root.apfs` as `ramdisk`.
 - Test images are kept in `releases/` (gitignored): `xnu-bitra-H.img` has 10 s pauses in the loader (after the firmware-log lines and before the jump).
+
+## Image H result: the firmware UFS driver runs, but exposes no block device (2026-11-25)
+
+Photos of image H (loader pauses 10 s). Mu's own log (RAM log buffer at 0x9FFF7000, read by the loader) says:
+
+    Boot Device : UFS.
+    UFS INQUIRY ID: SAMSUNG KLUEG8UHDB-C2D1 1903.
+    UFS Boot LUN: 1.
+    restore_to_ufs_from_buf: Backup region is corrupted either..
+    boot_dev_ufs: 0x1
+    BOOT: You are calling UFSFirmwareOps function now..
+    ERROR: ufs fw head magic error!.   (twice)
+
+So UFSDxe initialised the controller and talked to the disk (inquiry, boot LUN), and then only the firmware-update
+path (UFSFirmwareOps) complained. Nothing in the log says why no BlockIo/PartitionInfo appears. The gzip payload
+(5.5 MB -> 20.2 MB, CRC ok) and the kernel run are fine; this image (flashboot as md0, no root_apfs) mounts the
+1-file boot volume, finds no launchd and halts, as expected.
+
+Consequence: `ufs=2` cannot serve `darwin` (the loader needs BlockIo). The controller is live at 0x1d84000 (same
+address as SM8250's `ufshc`), so the way forward is `ufs_native=1`, but the kernel's unit map (`ufs_native_map`,
+`ufs_shared_pa` page) is built from the loader's BlockIo survey. For bitra the loader must instead publish a
+synthetic unit list (LUN 0, 4096-byte blocks, 61,777,920 blocks) or the kernel must probe LUNs itself.
+Also unknown: whether the controller's DMA (SMMU config) lets it reach the loader's `hc_area`.
