@@ -258,3 +258,9 @@ WRAPS (keeps the newest 8 MiB; `tools/xnulog/readring.py` unrolls a dump), the l
   `mkbitraimg.py --mode RELEASE`); not yet run on the phone.
 - Image AK (RELEASE Mu, `loader_quiet=1`, `vcquiet=1`; 2026-11-26): runs like the DEBUG images (23 services spawned, `kernel log: 280092 bytes, in the loader ring at f0800000`, phone back in Alpine by itself). Mu prints nothing; the `fwlog:` lines in the loader ring are
   Mu's log buffer text left from earlier boots (it keeps text across resets).
+
+## All 8 cores, and the iOS UI (2026-11-26, image AL)
+Image AL = AK with `cpus=8` (kernel on core 0, no `bootcpu`): the kernel registers cores 0-7 (MPIDR 0x000..0x700), starts the big cores 4-7 first and the small 1-3 later with PSCI CPU_ON over SMC (the same conduit Linux uses here: `PSCIv1.1`, `SMC Calling Convention v1.1`),
+`GenericARMPE: the slower cores started too: 8 processors running`, 45 checks 0 failed, 27 launchd services, and **the owner saw the iOS UI come up: SpringBoard home screen with the dialer and apps** (touch is not wired yet; the display geometry is the UEFI framebuffer 1080x2400
+under 1125x2436 surfaces). Kernel time to launchd dropped from ~50 s to ~30 s. At `loader_return_after` PSCI stops the other cores (`psci: cpu 6 ends the system`) and the boot processor returns to the loader.
+Log: 430 KB in the loader ring; the unimplemented-service noise is SpringBoard asking launchd for services the image does not have (sleepd, chronod, commcenter, biome, mobileactivationd ...).
