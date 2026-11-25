@@ -253,3 +253,6 @@ entitlement)" 583 times and `minisandbox: privilege 1015 refused to lsd` (the AM
 brought the kernel back at ~140 s of kernel time (log 246 KB in the loader), the phone went to Alpine by itself.
 Faster logs: the screen is the slow part (each console line is drawn and the framebuffer scrolled; launchd's volume throttles the whole boot). Image AI: `vcquiet=1` feeds the RAM ring but skips drawing, the kernel ring is 8 MiB and
 WRAPS (keeps the newest 8 MiB; `tools/xnulog/readring.py` unrolls a dump), the loader ring moved to 0xf0800000 (`insmod xnulog.ko pa=0xf0800000 size=0x100000`; the kernel ring is `pa=0xf0000000 size=0x800000`, the module defaults).
+- `loader_quiet=1` (image AJ): the loader skips its photograph pauses, writes the kernel's log into its own ring (now 4 MiB at 0xf0800000, `insmod xnulog.ko pa=0xf0800000 size=0x400000`) instead of drawing it, one summary line. The firmware's own on-screen logging
+  is `DebugLib` through `FrameBufferSerialPortLib`; a DEBUG build prints (`PcdDebugPrintErrorLevel 0x8007EE0F`), a RELEASE build does not (level 0): image AK = AJ's payload with the RELEASE Mu (`EXTRA="-r RELEASE" sh uefi/mu-silicium-bitra/build.sh`,
+  `mkbitraimg.py --mode RELEASE`); not yet run on the phone.
