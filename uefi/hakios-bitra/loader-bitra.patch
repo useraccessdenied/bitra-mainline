@@ -18,7 +18,7 @@ index 2d35c83..cf9f9b7 100644
  typedef struct {
  	uint32_t type; uint32_t pad; uint64_t phys_start; uint64_t virt_start; uint64_t pages; uint64_t attribute;
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..6d63ee4 100644
+index 735b9d0..650d3b8 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
 @@ -171,6 +171,7 @@ str_eq(const char *a, const char *b)
@@ -139,8 +139,7 @@ index 735b9d0..6d63ee4 100644
 +				screen_quiet = q;
 +				lring_sync();
 +				print("kernel log: %d bytes, in the loader ring at f0800000\n", klog_len);
- 			}
--			print("\n== END OF LOG ==\n");
++			}
 +			BS->stall(2000000ULL);
 +			return;
 +		}
@@ -160,7 +159,8 @@ index 735b9d0..6d63ee4 100644
 +
 +			for (uint64_t i = 0; i < n; i++) {
 +				loader_copy[i] = log_buf[i];
-+			}
+ 			}
+-			print("\n== END OF LOG ==\n");
 +			show_log_page(loader_copy, n, 0, 1, 2, "LOADER");
 +			show_log_page(loader_copy, n, PAGE_LINES, 2, 2, "LOADER");
 +		}
@@ -315,7 +315,7 @@ index 735b9d0..6d63ee4 100644
  	lo = hc_rd(HC_UTRLBA);
  	hi = hc_rd(HC_UTRLBAU);
  	print("ufs: controller at %x: CAP %x, VER %x, HCE %x, HCS %x, IS %x, IE %x, list %x:%x, run %x, doorbell %x\n",
-@@ -1923,6 +2126,224 @@ block_is_darwin(const efi_partition_info *info, const efi_block_io *bio, const s
+@@ -1923,6 +2126,317 @@ block_is_darwin(const efi_partition_info *info, const efi_block_io *bio, const s
  	return 1;
  }
  
@@ -537,10 +537,103 @@ index 735b9d0..6d63ee4 100644
 +	lring_sync();
 +}
 +
++
++/*
++ * bitra: can the pin controller (TLMM, 0x0f100000) be written from here, at UEFI time? Image AN/AO: writes of gpio39's and gpio36's registers
++ * from the kernel reset the phone while reads are fine. A harmless test: write what a pin already has back to it (a logical no-op), the
++ * steps said first to the ring (tlmm_test=PIN on the command line).
++ */
++static int tlmm_test_pin = -1;
++
++/*
++ * Image AP: a no-op write to gpio36 at UEFI time reset the phone. Now (tlmm_test=1): the configuration of all 180 pins read (reads only) and the
++ * non-zero ones listed; then the same no-op write on a few other pins, each said first, gpio36 last: the ring says how far it got.
++ */
++static void
++tlmm_test(void)
++{
++	static const int pins[] = { 0, 50, 100, 150, 36 };
++	uint32_t shown = 0;
++
++	print("tlmm: scanning the CFG registers of gpio0..179 (reads only)\n");
++	for (int pin = 0; pin < 180; pin++) {
++		uint32_t c = *(volatile uint32_t *)(uintptr_t)(0x0f100000ULL + 0x1000ULL * (uint64_t)pin);
++
++		if (c != 0) {
++			print("tlmm: gpio%d CFG %x\n", (uint64_t)pin, (uint64_t)c);
++			shown++;
++		}
++	}
++	print("tlmm: %d of 180 pins have a non-zero CFG\n", (uint64_t)shown);
++	for (unsigned i = 0; i < sizeof(pins) / sizeof(pins[0]); i++) {
++		uint64_t base = 0x0f100000ULL + 0x1000ULL * (uint64_t)pins[i];
++		volatile uint32_t *cfg = (volatile uint32_t *)(uintptr_t)base, *io = (volatile uint32_t *)(uintptr_t)(base + 4);
++		uint32_t c = *cfg, v = *io;
++
++		print("tlmm: gpio%d: CFG %x IO %x; writing CFG back (the same value) now\n", (uint64_t)pins[i], (uint64_t)c, (uint64_t)v);
++		*cfg = c;
++		__asm__ volatile ("dsb sy" ::: "memory");
++		print("tlmm: gpio%d: CFG written; writing IO back (the same value) now\n", (uint64_t)pins[i]);
++		*io = v;
++		__asm__ volatile ("dsb sy" ::: "memory");
++		print("tlmm: gpio%d: IO written\n", (uint64_t)pins[i]);
++	}
++	print("tlmm: all done\n");
++}
++
++
++/*
++ * Image AR: even a no-op write to gpio0's CFG resets the phone from here (UEFI, boot services still up); reads are fine. Qualcomm phones give
++ * the OS the pin controller when the boot loader hands over (ExitBootServices and the callbacks of its drivers), which this loader never does.
++ * tlmm_test=2: exit boot services (nothing of UEFI is used after it: the ring only), then the same no-op writes (gpio0, then gpio36 CFG and IO),
++ * then PSCI SYSTEM_RESET. The UFS driver's callback runs too (what it does to the device is the point of the next look).
++ */
++static efi_handle g_image;
++extern int64_t psci_call(uint64_t function, uint64_t a1, uint64_t a2, uint64_t a3);
++
++static void
++tlmm_ebs_test(void)
++{
++	static uint8_t map[256 * 1024] __attribute__((aligned(16)));
++	uint64_t size = sizeof(map), key = 0, dsz = 0;
++	uint32_t dver = 0;
++	efi_status st;
++
++	print("ebs: getting the memory map\n");
++	st = BS->get_memory_map(&size, map, &key, &dsz, &dver);
++	print("ebs: map %d bytes, status %x; exiting boot services now (the screen is quiet from here)\n", size, (uint64_t)st);
++	screen_quiet = 1;
++	st = BS->exit_boot_services(g_image, key);
++	if (EFI_ERROR(st)) {
++		size = sizeof(map);
++		st = BS->get_memory_map(&size, map, &key, &dsz, &dver);
++		st = BS->exit_boot_services(g_image, key);
++	}
++	print("ebs: exit_boot_services status %x\n", (uint64_t)st);
++	if (EFI_ERROR(st)) {
++		return;
++	}
++	for (int i = 0; i < 2; i++) {
++		uint64_t pin = i == 0 ? 0 : 36, base = 0x0f100000ULL + 0x1000ULL * pin;
++		volatile uint32_t *cfg = (volatile uint32_t *)(uintptr_t)base, *io = (volatile uint32_t *)(uintptr_t)(base + 4);
++		uint32_t c = *cfg, v = *io;
++
++		print("ebs: gpio%d: CFG %x IO %x; writing CFG back now\n", pin, (uint64_t)c, (uint64_t)v);
++		*cfg = c;
++		__asm__ volatile ("dsb sy" ::: "memory");
++		print("ebs: gpio%d: CFG written; writing IO back now\n", pin);
++		*io = v;
++		__asm__ volatile ("dsb sy" ::: "memory");
++		print("ebs: gpio%d: IO written\n", pin);
++	}
++	print("ebs: the pin controller took the writes; PSCI SYSTEM_RESET now\n");
++	psci_call(0x84000009ULL, 0, 0, 0);
++}
++
  static void
  block_start(void)
  {
-@@ -1942,6 +2363,7 @@ block_start(void)
+@@ -1942,6 +2456,7 @@ block_start(void)
  
  	memset(&block_shared, 0, sizeof(block_shared));
  	block_tables();
@@ -548,7 +641,7 @@ index 735b9d0..6d63ee4 100644
  	/* the logical units: the block devices that are not partitions of another */
  	if (!EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &blk_guid, NULL, &count, &handles))) {
  		for (uint64_t i = 0; i < count && nunits < BLOCK_MAX_UNITS; i++) {
-@@ -1964,7 +2386,34 @@ block_start(void)
+@@ -1964,7 +2479,34 @@ block_start(void)
  	}
  	if (EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &part_guid, NULL, &count, &handles))) {
  		print("ufs: no partition information: the block service is off\n");
@@ -584,7 +677,7 @@ index 735b9d0..6d63ee4 100644
  	}
  	for (uint64_t i = 0; i < count && block_shared.parts + nunits < BLOCK_MAX_PARTS; i++) {
  		struct loader_block_part *bp = &block_shared.part[block_shared.parts];
-@@ -2022,12 +2471,13 @@ block_start(void)
+@@ -2022,12 +2564,13 @@ block_start(void)
  		block_bios[block_shared.parts++] = units[u].bio;
  	}
  	/* the kernel's own transfer list: this loader's area, if the controller is as UEFI keeps it */
@@ -601,7 +694,7 @@ index 735b9d0..6d63ee4 100644
  		block_shared.native.ucd_offset = HC_UCD_OFFSET;
  		block_shared.native.ucd_size = HC_UCD_SIZE;
  		block_shared.native.slots = HC_SLOTS;
-@@ -2160,7 +2610,8 @@ block_poll(void)
+@@ -2160,7 +2703,8 @@ block_poll(void)
  	op = block_shared.ask.op;
  	started = READ_SYSREG(CNTVCT_EL0);
  	bytes = 0;
@@ -611,7 +704,7 @@ index 735b9d0..6d63ee4 100644
  	    lba < block_shared.part[part].blocks && count <= block_shared.part[part].blocks - lba) {
  		efi_block_io *bio = block_bios[part];
  
-@@ -2529,6 +2980,20 @@ wdt_arm(void)
+@@ -2529,6 +3073,20 @@ wdt_arm(void)
  {
  	uint64_t ctl = 0, since = 0;
  
@@ -632,21 +725,32 @@ index 735b9d0..6d63ee4 100644
  	if (PLAT != &platform_redwood) {
  		return; /* SMC is not routed anywhere useful on QEMU virt */
  	}
-@@ -3082,6 +3547,10 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3082,6 +3640,16 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  		block_probe_requested |= starts_with(c, "ufs_probe=1") && (c == pi.cmdline || c[-1] == ' ');
  		block_write_requested |= starts_with(c, "ufs_write=1") && (c == pi.cmdline || c[-1] == ' ') &&
  		    (c[11] == 0 || c[11] == ' ');
 +		tur_requested |= starts_with(c, "ufs_tur=1") && (c == pi.cmdline || c[-1] == ' ');
 +		loader_quiet |= starts_with(c, "loader_quiet=1") && (c == pi.cmdline || c[-1] == ' ');
++		if (starts_with(c, "tlmm_test=") && (c == pi.cmdline || c[-1] == ' ')) {
++			tlmm_test_pin = 0;
++			for (const char *d = c + 10; *d >= '0' && *d <= '9'; d++) {
++				tlmm_test_pin = tlmm_test_pin * 10 + (*d - '0');
++			}
++		}
 +		smmu_dump_requested |= starts_with(c, "smmu_dump=1") && (c == pi.cmdline || c[-1] == ' ');
 +		smmu_bypass_requested |= starts_with(c, "smmu_bypass=1") && (c == pi.cmdline || c[-1] == ' ');
  		hc_requested |= starts_with(c, "ufs_native=") && (c == pi.cmdline || c[-1] == ' ') && c[11] >= '1' &&
  		    c[11] <= '9';
  	}
-@@ -3097,6 +3566,16 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3097,6 +3665,21 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  	if (ufs_requested >= 2) {
  		block_start();
  	}
++	if (PLAT == &platform_bitra && tlmm_test_pin == 2) {
++		tlmm_ebs_test();
++	} else if (PLAT == &platform_bitra && tlmm_test_pin >= 0) {
++		tlmm_test();
++	}
 +	if (PLAT == &platform_bitra && (smmu_dump_requested || smmu_bypass_requested)) {
 +		smmu_dump_bypass();
 +		if (!loader_quiet) {
@@ -660,7 +764,7 @@ index 735b9d0..6d63ee4 100644
  	if (checkpoint == CHECKPOINT_SELFTEST) {
  		kernel_mpidr = this_mpidr;
  	}
-@@ -3111,6 +3590,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3111,6 +3694,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  		}
  	}
  	for (const char *c = pi.cmdline; *c; c++) {
@@ -673,7 +777,7 @@ index 735b9d0..6d63ee4 100644
  		if (starts_with(c, "loader_return_after=")) {
  			for (c += 20; *c >= '0' && *c <= '9'; c++) {
  				kernel_budget = kernel_budget * 10 + (uint64_t)(*c - '0');
-@@ -3538,7 +4023,11 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3538,7 +4127,11 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  	if (kernel_mpidr != this_mpidr) {
  		print("the kernel will run on core %x (this is core %x)\n", kernel_mpidr, this_mpidr);
  	}
@@ -685,7 +789,7 @@ index 735b9d0..6d63ee4 100644
  	flush_log();
  	screen_quiet_before_run = screen_quiet;
  	screen_quiet = 1;               /* the screen is the kernel's now; the log still takes every line */
-@@ -4295,6 +4784,364 @@ ramfb_phone_screen(void)
+@@ -4295,6 +4888,364 @@ ramfb_phone_screen(void)
   * Only the kernel and a root image that fits in the payload come this way; the big Darwin system image does not
   * (docs/uefi-boot.md says what does).
   */
@@ -1050,7 +1154,15 @@ index 735b9d0..6d63ee4 100644
  static uint64_t volume_payload_bytes;           /* 0: nothing was read; else the payload's size */
  static const char *volume_payload_note;         /* why not, if it was looked for */
  
-@@ -4437,11 +5284,16 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4428,6 +5379,7 @@ print_banner(void)
+ efi_status EFIAPI
+ efi_main(efi_handle image, efi_system_table *st)
+ {
++	g_image = image;
+ 	static const efi_guid gop_guid = EFI_GOP_GUID;
+ 	struct payload_info pi;
+ 
+@@ -4437,11 +5389,16 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	BS->set_watchdog_timer(0, 0, 0, NULL);
  	/* no payload in memory (nobody put one there): the volume this loader came from may have one, as a UEFI boot loader's does */
@@ -1067,7 +1179,7 @@ index 735b9d0..6d63ee4 100644
  	if (volume_payload_bytes != 0) {
  		print("payload: %d bytes from \\EFI\\hakios\\payload.bin on the volume this loader was started from\n",
  		    volume_payload_bytes);
-@@ -4462,6 +5314,8 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4462,6 +5419,8 @@ efi_main(efi_handle image, efi_system_table *st)
  		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
  		if (SCREEN.base == 0xE1000000ULL) {
  			PLAT = &platform_redwood;
@@ -1076,7 +1188,7 @@ index 735b9d0..6d63ee4 100644
  		} else if (SCREEN.base == 0xB8000000ULL) {
  			PLAT = &platform_garnet;
  		} else {
-@@ -4473,6 +5327,21 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4473,6 +5432,21 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	install_exception_hook();
  	wdt_arm();

@@ -51,10 +51,10 @@ index bae6bc7..9859115 100644
    # Platform PEI
 diff --git a/Platforms/Realme/bitraPkg/hakios/loader.efi b/Platforms/Realme/bitraPkg/hakios/loader.efi
 new file mode 100755
-index 0000000..05a2b32
+index 0000000..006439c
 Binary files /dev/null and b/Platforms/Realme/bitraPkg/hakios/loader.efi differ
 diff --git a/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c b/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c
-index 3a0a8a2..23ee590 100644
+index 3a0a8a2..ef21d03 100644
 --- a/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c
 +++ b/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c
 @@ -3,6 +3,8 @@
@@ -66,7 +66,7 @@ index 3a0a8a2..23ee590 100644
  VOID
  GetPlatformBootOptions (
    OUT EFI_PLATFORM_BOOT_OPTION **BootOption,
-@@ -12,7 +14,7 @@ GetPlatformBootOptions (
+@@ -12,19 +14,25 @@ GetPlatformBootOptions (
    UINT8                     LocalBootOptionCount = 0;
  
    // Allocate Memory
@@ -75,15 +75,22 @@ index 3a0a8a2..23ee590 100644
    if (LocalBootOption == NULL) {
      DEBUG ((EFI_D_ERROR, "%a: Failed to Allocate Memory for Boot Options!\n", __FUNCTION__));
      goto exit;
-@@ -23,8 +25,13 @@ GetPlatformBootOptions (
-   LocalBootOption[0].AppGuid       = FixedPcdGetPtr (PcdMassStorageFile);
-   LocalBootOption[0].LoadAttribute = LOAD_OPTION_HIDDEN;
+   }
  
-+  // HackiOS loader (bitra experiment)
-+  LocalBootOption[1].AppName       = L"HackiOS";
-+  LocalBootOption[1].AppGuid       = &mHakiosLoaderGuid;
-+  LocalBootOption[1].LoadAttribute = LOAD_OPTION_ACTIVE;
++  // HackiOS loader (bitra experiment): FIRST, so that it is what boots when no key is held; before, it was second and only a Volume Up
++  // press at the right moment chose it, and without one the (empty) mass storage was tried first, failed, and the phone went to recovery
++  LocalBootOption[0].AppName       = L"HackiOS";
++  LocalBootOption[0].AppGuid       = &mHakiosLoaderGuid;
++  LocalBootOption[0].LoadAttribute = LOAD_OPTION_ACTIVE;
 +
+   // Add Mass Storage Boot Option
+-  LocalBootOption[0].AppName       = L"Mass Storage";
+-  LocalBootOption[0].AppGuid       = FixedPcdGetPtr (PcdMassStorageFile);
+-  LocalBootOption[0].LoadAttribute = LOAD_OPTION_HIDDEN;
++  LocalBootOption[1].AppName       = L"Mass Storage";
++  LocalBootOption[1].AppGuid       = FixedPcdGetPtr (PcdMassStorageFile);
++  LocalBootOption[1].LoadAttribute = LOAD_OPTION_HIDDEN;
+ 
    // Set Boot Option Count
 -  LocalBootOptionCount = 1;
 +  LocalBootOptionCount = 2;

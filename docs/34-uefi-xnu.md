@@ -270,3 +270,7 @@ Log: 430 KB in the loader ring; the unimplemented-service noise is SpringBoard a
 and the working Linux driver; samples go to `/dev/hakios-touch` as a fraction of the panel. Image AM (`touchscreen=1`) reset the phone ~2 s after launchd started with no `touch:` line; AN (a line before every access)
 stopped at `the interrupt line (gpio39) to an input with a pull-up`: **writing GPIO 39's registers resets the phone** (reading all of GPIOs 36-39 is fine: bootloader state is plain GPIO, no pull). The chip drives its interrupt line, so AO writes
 only the I2C pins, and GPIO 38 (reset) only if the chip does not answer, every register write logged first. Power of the chip's two PM8150C supplies is not switched by this driver (whatever the boot loader left).
+- **Why runs sometimes went to recovery (fixed, image AR):** the Mu patch had Mass Storage as boot option 0 (hidden) and HackiOS as option 1; without a Vol-up press in time Mu tried the empty mass storage first, failed, and the phone reset into recovery.
+  `PlatformBootOptions.c` now has HackiOS first (no key needed).
+- **Pin controller writes are blocked before the OS handoff (images AP, AR):** from the loader (UEFI up) a no-op write of a pin's CFG back to itself resets the phone, for gpio36 and for gpio0; reads are fine
+  (the scan of gpio0..179 shows 47 pins configured by the firmware, e.g. gpio133-145 `CFG 1`, gpio146-179 `CFG 801`). Image AS (`tlmm_test=2`): exit boot services first, then the same writes, then PSCI SYSTEM_RESET.
