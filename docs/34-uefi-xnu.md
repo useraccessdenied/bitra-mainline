@@ -226,3 +226,6 @@ a unit reads may go to; stop, LOEJ, every power condition and the well-known uni
   completed without an error line but the bytes were not `EFI PART` (image AD dumps blocks 0-2 on that failure). Image AD: the run did not get that far: the kernel refused to start
   (`UEFI's command descriptor is not where it was`): UEFI's list memory (UTRLBA 9a136000) held code again. Mu's UFSDxe frees that memory after use and it is reused, so the driver's
   check that UEFI's slot 0 holds a read is only said now, not required (image AE); UEFI's list is put back by the address in the registers.
+- Image AE/AF: with the stale-list check informational, the run reaches the proof (wake OK, TEST UNIT READY OK) and a READ of LUN 0: the controller says success (`OCS 0`, response `status 0`,
+  residual 0, PRD target 1_02acc000, 4096 bytes, a correct READ(10) of LBA 1), but the whole 256 KB buffer stays zero. So the data DMA does not arrive where the CPU looks. Suspects:
+  the buffer is above 4 GB and cached. Image AG: the data buffers are in the loader's UEFI area (below 4 GB, mapped uncached, behind the lists).
