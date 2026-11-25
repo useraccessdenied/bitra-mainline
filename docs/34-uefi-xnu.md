@@ -195,3 +195,9 @@ group matches is a fault), `IDR0 4c017e57` (87 stream groups), only 5 valid SMR:
 fault, hard reset (`androidboot.startupmode=hard_reset`). This explains J..R (kernel and loader alike, UEFI's memory or ours).
 Fix under test (image T): make a free stream group for each of 0xe0 and 0x4e0, S2CR type bypass first, SMR valid last, then retry the
 TEST UNIT READY. The kernel's own driver will have to do the same (map 0x15000000, same two groups) before it takes the controller.
+- Image T: the two new groups (0xe0, 0x4e0, SMR valid, S2CR type 1 = bypass) were written, but the S2CR reads back `20000` (type 2 = fault): this SMMU
+  does not accept plain bypass from the non-secure side (idle groups are `...200ff`, also fault). Then the loader's TEST UNIT READY died in a loader
+  exception: UEFI's list address (UTRLBA 9a135000) now held code (UEFI frees its list memory after use and reuses it; the list in UTRLBA is stale, so it
+  cannot be used for commands, and the loader-side TUR test was dropped). Image U: a stage 1 context bank (free CB, `CBAR` type 1, 64-bit, TCR 39-bit 4 KB WB,
+  MAIR0 0xff) with one identity table of 16 x 1 GB blocks (`0x741`), `SCTLR.M`, and the two groups translate (S2CR type 0, that bank); the kernel's
+  own driver then does its proof and reads (`ufs_native=1 smmu_bypass=1`).
