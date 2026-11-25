@@ -173,3 +173,8 @@ Also unknown: whether the controller's DMA (SMMU config) lets it reach the loade
   (19 of 23 checks pass; failing: the darwin mount [native reads off in this mode], the /private/var memory fs, a symlink, launchd.darwin).
   So the controller restart with a different list is harmless; the reset comes with the first command (the proof's TEST UNIT READY
   doorbell, i.e. the controller's first DMA fetch of this kernel's UTRD/UCD). Next: breadcrumbs around the doorbell (image N).
+- Image N (breadcrumbs): the log ends at `proof: ringing slot 0 now (list 99b26000 run 1 HCS 10f IS 400)`; the `rung` line never prints, so the
+  phone resets when the doorbell is written, i.e. at the controller's first DMA fetch of this kernel's UTRD/UCD (UTRD `10000000 0 f 0 99b27000 0
+  800080 01000000`, sane). Image O (Mu with the stock `EnableUfsIOC = 0`): Mu does not boot at all (ABL goes to recovery); the patch's `EnableUfsIOC = 1` is
+  needed on this phone. Remaining suspect: which memory the controller's DMA may reach (SMMU). Next: send the TEST UNIT READY through UEFI's own list
+  and descriptor memory (no switch) to see whether DMA to UEFI's own pages works.
