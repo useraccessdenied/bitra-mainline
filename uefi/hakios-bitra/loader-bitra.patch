@@ -18,7 +18,7 @@ index 2d35c83..cf9f9b7 100644
  typedef struct {
  	uint32_t type; uint32_t pad; uint64_t phys_start; uint64_t virt_start; uint64_t pages; uint64_t attribute;
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..535ac6e 100644
+index 735b9d0..98c4371 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
 @@ -347,6 +347,68 @@ static int hc_log_skips;                /* logs not written this run (said twice
@@ -105,7 +105,8 @@ index 735b9d0..535ac6e 100644
 +					put_char(klog[i]);
 +				}
 +				print("\n== END OF LOG ==\n");
-+			}
+ 			}
+-			print("\n== END OF LOG ==\n");
 +			return;
 +		}
 +		{
@@ -114,8 +115,7 @@ index 735b9d0..535ac6e 100644
 +
 +			for (uint64_t i = 0; i < n; i++) {
 +				loader_copy[i] = log_buf[i];
- 			}
--			print("\n== END OF LOG ==\n");
++			}
 +			show_log_page(loader_copy, n, 0, 1, 2, "LOADER");
 +			show_log_page(loader_copy, n, PAGE_LINES, 2, 2, "LOADER");
 +		}
@@ -229,7 +229,45 @@ index 735b9d0..535ac6e 100644
  		for (uint64_t i = 0; i < count; i++) {
  			efi_block_io *bio;
  
-@@ -1942,6 +2102,7 @@ block_start(void)
+@@ -1716,7 +1876,8 @@ device_path_print(uint64_t unit, const efi_device_path *dp)
+ #define HC_UCD_SIZE        0x800
+ #define HC_AREA_SIZE       (HC_UCD_OFFSET + HC_SLOTS * HC_UCD_SIZE)
+ 
+-static uint8_t hc_area[HC_AREA_SIZE] __attribute__((aligned(0x2000)));
++static uint8_t hc_area_static[HC_AREA_SIZE] __attribute__((aligned(0x2000)));
++static uint8_t *hc_area = hc_area_static;   /* bitra: pages from UEFI's own memory (hc_init), where its UFS driver's list is */
+ static int hc_requested;                /* ufs_native= on the command line */
+ static int hc_known;                    /* UEFI's list address is kept here: check it, put it back */
+ static uint32_t hc_uefi_lo, hc_uefi_hi;
+@@ -1833,11 +1994,26 @@ hc_take_back(const char *when)
+ static int
+ hc_init(void)
+ {
+-	uint32_t lo, hi, area = (uint32_t)(uintptr_t)hc_area;
++	uint32_t lo, hi, area;
+ 
+ 	if (!hc_requested) {
+ 		return 0;
+ 	}
++	if (PLAT == &platform_bitra && hc_area == hc_area_static) {
++		/* the kernel's list in this loader's own image made the phone reset when the controller fetched it (image J):
++		 * Qualcomm's UFS driver keeps its list in UEFI's pool, so take the pages from UEFI too */
++		uint64_t a = 0;
++
++		if (!EFI_ERROR(BS->allocate_pages(AllocateAnyPages, 4 /* EfiBootServicesData */, HC_AREA_SIZE / 4096 + 1, &a)) &&
++		    (a & 0xfff) == 0) {
++			hc_area = (uint8_t *)(uintptr_t)a;
++			print("ufs: the kernel's list area is UEFI memory at %x (UEFI's own list: %x)\n", a,
++			    (uint64_t)hc_rd(HC_UTRLBA));
++		} else {
++			print("ufs: no UEFI pages for the list area: this loader's image it is\n");
++		}
++	}
++	area = (uint32_t)(uintptr_t)hc_area;
+ 	lo = hc_rd(HC_UTRLBA);
+ 	hi = hc_rd(HC_UTRLBAU);
+ 	print("ufs: controller at %x: CAP %x, VER %x, HCE %x, HCS %x, IS %x, IE %x, list %x:%x, run %x, doorbell %x\n",
+@@ -1942,6 +2118,7 @@ block_start(void)
  
  	memset(&block_shared, 0, sizeof(block_shared));
  	block_tables();
@@ -237,7 +275,7 @@ index 735b9d0..535ac6e 100644
  	/* the logical units: the block devices that are not partitions of another */
  	if (!EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &blk_guid, NULL, &count, &handles))) {
  		for (uint64_t i = 0; i < count && nunits < BLOCK_MAX_UNITS; i++) {
-@@ -1964,7 +2125,34 @@ block_start(void)
+@@ -1964,7 +2141,34 @@ block_start(void)
  	}
  	if (EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &part_guid, NULL, &count, &handles))) {
  		print("ufs: no partition information: the block service is off\n");
@@ -273,15 +311,24 @@ index 735b9d0..535ac6e 100644
  	}
  	for (uint64_t i = 0; i < count && block_shared.parts + nunits < BLOCK_MAX_PARTS; i++) {
  		struct loader_block_part *bp = &block_shared.part[block_shared.parts];
-@@ -2022,6 +2210,7 @@ block_start(void)
+@@ -2022,12 +2226,13 @@ block_start(void)
  		block_bios[block_shared.parts++] = units[u].bio;
  	}
  	/* the kernel's own transfer list: this loader's area, if the controller is as UEFI keeps it */
 +offer_native:
  	if (hc_known && hc_list_is_uefis() && hc_rd(HC_UTRLDBR) == 0 && (hc_rd(HC_HCE) & 1)) {
- 		memset(hc_area, 0, sizeof(hc_area));
- 		flush_dcache((uint64_t)(uintptr_t)hc_area, (uint64_t)(uintptr_t)hc_area + sizeof(hc_area));
-@@ -2160,7 +2349,8 @@ block_poll(void)
+-		memset(hc_area, 0, sizeof(hc_area));
+-		flush_dcache((uint64_t)(uintptr_t)hc_area, (uint64_t)(uintptr_t)hc_area + sizeof(hc_area));
++		memset(hc_area, 0, HC_AREA_SIZE);
++		flush_dcache((uint64_t)(uintptr_t)hc_area, (uint64_t)(uintptr_t)hc_area + HC_AREA_SIZE);
+ 		block_shared.native.hc_pa = HC_PA;
+ 		block_shared.native.area_pa = (uint64_t)(uintptr_t)hc_area;
+-		block_shared.native.area_size = sizeof(hc_area);
++		block_shared.native.area_size = HC_AREA_SIZE;
+ 		block_shared.native.ucd_offset = HC_UCD_OFFSET;
+ 		block_shared.native.ucd_size = HC_UCD_SIZE;
+ 		block_shared.native.slots = HC_SLOTS;
+@@ -2160,7 +2365,8 @@ block_poll(void)
  	op = block_shared.ask.op;
  	started = READ_SYSREG(CNTVCT_EL0);
  	bytes = 0;
@@ -291,7 +338,7 @@ index 735b9d0..535ac6e 100644
  	    lba < block_shared.part[part].blocks && count <= block_shared.part[part].blocks - lba) {
  		efi_block_io *bio = block_bios[part];
  
-@@ -2529,6 +2719,20 @@ wdt_arm(void)
+@@ -2529,6 +2735,20 @@ wdt_arm(void)
  {
  	uint64_t ctl = 0, since = 0;
  
@@ -312,7 +359,7 @@ index 735b9d0..535ac6e 100644
  	if (PLAT != &platform_redwood) {
  		return; /* SMC is not routed anywhere useful on QEMU virt */
  	}
-@@ -3111,6 +3315,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3111,6 +3331,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  		}
  	}
  	for (const char *c = pi.cmdline; *c; c++) {
@@ -325,7 +372,7 @@ index 735b9d0..535ac6e 100644
  		if (starts_with(c, "loader_return_after=")) {
  			for (c += 20; *c >= '0' && *c <= '9'; c++) {
  				kernel_budget = kernel_budget * 10 + (uint64_t)(*c - '0');
-@@ -3539,6 +3749,9 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3539,6 +3765,9 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  		print("the kernel will run on core %x (this is core %x)\n", kernel_mpidr, this_mpidr);
  	}
  	print("jumping to %x\n", entry_va + slide);
@@ -335,7 +382,7 @@ index 735b9d0..535ac6e 100644
  	flush_log();
  	screen_quiet_before_run = screen_quiet;
  	screen_quiet = 1;               /* the screen is the kernel's now; the log still takes every line */
-@@ -4295,6 +4508,364 @@ ramfb_phone_screen(void)
+@@ -4295,6 +4524,364 @@ ramfb_phone_screen(void)
   * Only the kernel and a root image that fits in the payload come this way; the big Darwin system image does not
   * (docs/uefi-boot.md says what does).
   */
@@ -700,7 +747,7 @@ index 735b9d0..535ac6e 100644
  static uint64_t volume_payload_bytes;           /* 0: nothing was read; else the payload's size */
  static const char *volume_payload_note;         /* why not, if it was looked for */
  
-@@ -4437,11 +5008,16 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4437,11 +5024,16 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	BS->set_watchdog_timer(0, 0, 0, NULL);
  	/* no payload in memory (nobody put one there): the volume this loader came from may have one, as a UEFI boot loader's does */
@@ -717,7 +764,7 @@ index 735b9d0..535ac6e 100644
  	if (volume_payload_bytes != 0) {
  		print("payload: %d bytes from \\EFI\\hakios\\payload.bin on the volume this loader was started from\n",
  		    volume_payload_bytes);
-@@ -4462,6 +5038,8 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4462,6 +5054,8 @@ efi_main(efi_handle image, efi_system_table *st)
  		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
  		if (SCREEN.base == 0xE1000000ULL) {
  			PLAT = &platform_redwood;
@@ -726,7 +773,7 @@ index 735b9d0..535ac6e 100644
  		} else if (SCREEN.base == 0xB8000000ULL) {
  			PLAT = &platform_garnet;
  		} else {
-@@ -4473,6 +5051,10 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4473,6 +5067,10 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	install_exception_hook();
  	wdt_arm();

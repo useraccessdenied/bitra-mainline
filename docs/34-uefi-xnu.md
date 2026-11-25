@@ -153,3 +153,12 @@ Also unknown: whether the controller's DMA (SMMU config) lets it reach the loade
 - I = `root_apfs=ufs_darwin ufs=2 ufs_native=1 bootcpu=7 cpus=1`; J = the same without `bootcpu=7` (in case core 7 does not start).
   Both gzip payloads (5.7 MB). Unknown until run: whether the controller's DMA (SMMU) can reach `hc_area`.
 - Patches: `loader-bitra.patch`, `kernel-ufs-bitra.patch`.
+
+## Images I/J results and image K (2026-11-25)
+- I (`bootcpu=7`): resets right after `jumping to`, no kernel output. J (core 0): the kernel boots with the UFS driver built in, finds the
+  controller (CAP 1587031f, VER 300, HCE 1) and UEFI's list (9a12d000), whitelist self-test passes, and prints
+  `native: transfer list switched from UEFI's 9a12d000 to this kernel's a3455000`; then the phone resets (nothing more on screen).
+  After the switch the kernel rings a TEST UNIT READY (no data) as proof, so the controller's fetch of the list/UCD from the loader's
+  image memory (a3455000) is what resets the phone (XPU/SMMU), not a data buffer.
+- K = J with the list area in UEFI pages (`allocate_pages` BootServicesData; Qualcomm's UFSDxe keeps its list in its own pool).
+  Still open if K also resets: the kernel's data buffers (`kmem_alloc_contig`, high RAM) and the core-7 start (I).
