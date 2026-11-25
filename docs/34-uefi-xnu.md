@@ -222,3 +222,7 @@ a unit reads may go to; stop, LOEJ, every power condition and the well-known uni
   Image AC: the driver's one non-read command changes to what Linux's ufshcd sends to wake a UFS device: START STOP UNIT of the **device well-known unit
   (0xD0), power condition ACTIVE (CDB4 = 0x10)**, not immediate, no data. Every other START STOP UNIT (a normal unit, other power conditions, start/stop/eject
   bits) and every other use of a well-known unit stays refused (self-test cases). It writes no data.
+- Image AC: the device-unit ACTIVE wake works (`START STOP UNIT` of 0xD0, power condition ACTIVE: response 00 status 00) and the TEST UNIT READY then passes. The first block-1 read
+  completed without an error line but the bytes were not `EFI PART` (image AD dumps blocks 0-2 on that failure). Image AD: the run did not get that far: the kernel refused to start
+  (`UEFI's command descriptor is not where it was`): UEFI's list memory (UTRLBA 9a136000) held code again. Mu's UFSDxe frees that memory after use and it is reused, so the driver's
+  check that UEFI's slot 0 holds a read is only said now, not required (image AE); UEFI's list is put back by the address in the registers.
