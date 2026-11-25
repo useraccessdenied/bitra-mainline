@@ -1,3 +1,78 @@
+diff --git a/docs/boot-args.md b/docs/boot-args.md
+index 052757f..c52f648 100644
+--- a/docs/boot-args.md
++++ b/docs/boot-args.md
+@@ -261,11 +261,12 @@ Layers: **K** the kernel, **L** the loader, **U** user space (through `sysctl ke
+ | `buttons_steps` | K | `hakios.buttons.c` | `CONFIG_BUTTONS_STEPS` |  |
+ | `press_power` | K | `hakios.buttons.c` | `CONFIG_PRESS_POWER` |  |
+ | `press_power_ms` | K | `hakios.buttons.c` | `CONFIG_PRESS_POWER_MS` |  |
+-| `touch_flip` | K | `hakios.focaltech.c`, `hakios.goodix.c` | `CONFIG_TOUCH_FLIP` |  |
+-| `touch_poll_us` | K | `hakios.focaltech.c`, `hakios.goodix.c` | `CONFIG_TOUCH_POLL_US` |  |
++| `touch_flip` | K | `hakios.focaltech.c`, `hakios.goodix.c`, `hakios.synaptics.c` | `CONFIG_TOUCH_FLIP` |  |
++| `touch_i2c_us` | K | `hakios.synaptics.c` | `CONFIG_TOUCH_I2C_US` |  |
++| `touch_poll_us` | K | `hakios.focaltech.c`, `hakios.goodix.c`, `hakios.synaptics.c` | `CONFIG_TOUCH_POLL_US` |  |
+ | `touch_rate` | K | `hakios.focaltech.c`, `hakios.goodix.c` | `CONFIG_TOUCH_RATE` |  |
+ | `touch_spi_hz` | K | `hakios.goodix.c` | `CONFIG_TOUCH_SPI_HZ` |  |
+-| `touchscreen` | K | `hakios.buttons.c`, `hakios.focaltech.c`, `hakios.goodix.c` | `CONFIG_TOUCHSCREEN` |  |
++| `touchscreen` | K | `hakios.buttons.c`, `hakios.focaltech.c`, `hakios.goodix.c`, `hakios.synaptics.c` | `CONFIG_TOUCHSCREEN` |  |
+ | `virtio_input` | K | `hakios.virtio_input.c` | `CONFIG_VIRTIO_INPUT` |  |
+ 
+ ## Storage and APFS (43)
+diff --git a/drivers/core/hakios.stubs.c b/drivers/core/hakios.stubs.c
+index 77010fd..8420417 100644
+--- a/drivers/core/hakios.stubs.c
++++ b/drivers/core/hakios.stubs.c
+@@ -45,6 +45,10 @@ void hakios_goodix_init(void) {}
+ void hakios_focaltech_init(void) {}
+ #endif
+ 
++#ifndef HAKIOS_SYNAPTICS
++void hakios_synaptics_init(void) {}
++#endif
++
+ #ifndef HAKIOS_BUTTONS
+ void hakios_buttons_init(void) {}
+ #endif
+diff --git a/drivers/input/conf b/drivers/input/conf
+index 6c356ae..6f468ad 100644
+--- a/drivers/input/conf
++++ b/drivers/input/conf
+@@ -19,6 +19,11 @@ driver FOCALTECH
+ 	help    the touch screen for POCO X6 5G (Garnet): FocalTech FT3683G on SPI (touchscreen=1). The bus, pins
+ 	help    and supplies are the POCO X6's (SM7435 / QUP1 SE3)
+ 
++driver SYNAPTICS
++	file    bsd/dev/hakios.synaptics.c
++	help    the touch screen of the realme GT Neo 2 (bitra): a Synaptics S3908 (TouchComm v1) on I2C by hand (GPIO 36, 37),
++	help    reset GPIO 38, interrupt GPIO 39 (touchscreen=1). Its supplies are not switched here (the boot loader's state)
++
+ driver BUTTONS
+ 	file    bsd/dev/hakios.buttons.c
+ 	help    the power and volume keys, read from the PMIC through the SPMI arbiter (buttons=1)
+diff --git a/drivers/input/hakios.input.c b/drivers/input/hakios.input.c
+index 9a541f7..5030fff 100644
+--- a/drivers/input/hakios.input.c
++++ b/drivers/input/hakios.input.c
+@@ -292,6 +292,7 @@ hakios_input_init(void)
+ 	hakios_virtio_input_init();
+ 	hakios_goodix_init();
+ 	hakios_focaltech_init();
++	hakios_synaptics_init();
+ 	hakios_buttons_init();
+ 	hakios_battery_init();
+ 	hakios_ufs_init();
+diff --git a/drivers/map b/drivers/map
+index 71111c6..ec7c8a2 100644
+--- a/drivers/map
++++ b/drivers/map
+@@ -9,6 +9,7 @@
+ # Subsystems: input storage gpu camera haptic audio power wifi bluetooth modem net core
+ 
+ input    bsd/dev/hakios.goodix.c
++input    bsd/dev/hakios.synaptics.c
+ input    bsd/dev/hakios.focaltech_fw.h
+ input    bsd/dev/hakios.focaltech.c
+ input    bsd/dev/hakios.focaltech_garnet_fw.h
 diff --git a/drivers/storage/hakios.ufs.c b/drivers/storage/hakios.ufs.c
 index c4b6686..948e15c 100644
 --- a/drivers/storage/hakios.ufs.c
@@ -457,3 +532,15 @@ index 7b29ce8..df1c4e7 100644
  int ufshc_switch_in(bool prove);
  int ufshc_switch_out(const char *why);
  bool ufshc_list_in(void);
+diff --git a/xnu/files/bsd/sys/hakios.input.h b/xnu/files/bsd/sys/hakios.input.h
+index f2a13aa..27e020c 100644
+--- a/xnu/files/bsd/sys/hakios.input.h
++++ b/xnu/files/bsd/sys/hakios.input.h
+@@ -42,6 +42,7 @@ void hakios_input_init(void);
+ void hakios_virtio_input_init(void);   /* boot-arg virtio_input=1: QEMU's virtio pointer and keyboard */
+ void hakios_goodix_init(void);         /* boot-arg touchscreen=1: the phone's Goodix or FocalTech touch screen */
+ void hakios_focaltech_init(void);      /* boot-arg touchscreen=1: the POCO X6 FocalTech touch screen */
++void hakios_synaptics_init(void);      /* boot-arg touchscreen=1: the realme GT Neo 2's Synaptics S3908 touch screen */
+ void hakios_buttons_init(void);        /* boot-arg buttons=1: the phone's power and volume keys */
+ void hakios_ufs_init(void);           /* ufs=2 to xnuloader: the phone's storage, read only, through the loader (ufs_shared_pa=) */
+ void hakios_ufs_report(const char *when); /* where reading the storage has spent its time so far */
