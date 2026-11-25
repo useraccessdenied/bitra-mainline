@@ -18,10 +18,29 @@ index 2d35c83..cf9f9b7 100644
  typedef struct {
  	uint32_t type; uint32_t pad; uint64_t phys_start; uint64_t virt_start; uint64_t pages; uint64_t attribute;
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..6101556 100644
+index 735b9d0..3871978 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
-@@ -347,6 +347,68 @@ static int hc_log_skips;                /* logs not written this run (said twice
+@@ -198,6 +198,8 @@ put_char(char c)
+ }
+ 
+ /* printf subset: %s %x %d (64-bit values), %% */
++static uint8_t *lring;             /* bitra: the loader's own log ring in RAM (lring_init) */
++static void lring_sync(void);
+ static void
+ print(const char *fmt, ...)
+ {
+@@ -231,6 +233,9 @@ print(const char *fmt, ...)
+ 		}
+ 	}
+ 	__builtin_va_end(ap);
++	if (lring != NULL) {
++		lring_sync();
++	}
+ }
+ 
+ #define READ_SYSREG(name) ({ uint64_t _v; __asm__ volatile ("mrs %0, " #name : "=r" (_v)); _v; })
+@@ -347,6 +352,68 @@ static int hc_log_skips;                /* logs not written this run (said twice
  static void hc_print_state(const char *when);
  static void hc_take_back(const char *when);
  
@@ -90,7 +109,7 @@ index 735b9d0..6101556 100644
  static void
  write_logs(const char *klog, uint64_t klog_len)
  {
-@@ -355,12 +417,28 @@ write_logs(const char *klog, uint64_t klog_len)
+@@ -355,12 +422,28 @@ write_logs(const char *klog, uint64_t klog_len)
  	compose_logs(klog, klog_len);
  	if (bio == NULL) {
  		/* No log partition (QEMU): echo the returned kernel log on the console instead. */
@@ -124,7 +143,7 @@ index 735b9d0..6101556 100644
  		}
  		return;
  	}
-@@ -591,6 +669,15 @@ static const struct platform platform_redwood = {
+@@ -591,6 +674,15 @@ static const struct platform platform_redwood = {
  	.small_cores = 0x0f,
  };
  
@@ -140,7 +159,7 @@ index 735b9d0..6101556 100644
  static const struct platform platform_garnet = {
  	/* io_base must be non-zero: XNU treats a zero SoC base as "no SoC" and skips clock setup. */
  	.name = "garnet", .io_base = 0x00400000, .io_size = 0x1B000000,
-@@ -1436,6 +1523,77 @@ ufs_dump_super(efi_block_io *bio)
+@@ -1436,6 +1528,77 @@ ufs_dump_super(efi_block_io *bio)
  	}
  }
  
@@ -218,7 +237,7 @@ index 735b9d0..6101556 100644
  static void
  ufs_survey(void)
  {
-@@ -1444,8 +1602,10 @@ ufs_survey(void)
+@@ -1444,8 +1607,10 @@ ufs_survey(void)
  	efi_handle *handles;
  	uint64_t count, units = 0, partitions = 0;
  
@@ -229,17 +248,19 @@ index 735b9d0..6101556 100644
  		for (uint64_t i = 0; i < count; i++) {
  			efi_block_io *bio;
  
-@@ -1716,7 +1876,8 @@ device_path_print(uint64_t unit, const efi_device_path *dp)
+@@ -1716,7 +1881,10 @@ device_path_print(uint64_t unit, const efi_device_path *dp)
  #define HC_UCD_SIZE        0x800
  #define HC_AREA_SIZE       (HC_UCD_OFFSET + HC_SLOTS * HC_UCD_SIZE)
  
 -static uint8_t hc_area[HC_AREA_SIZE] __attribute__((aligned(0x2000)));
 +static uint8_t hc_area_static[HC_AREA_SIZE] __attribute__((aligned(0x2000)));
++static uint32_t hc_area_bytes = HC_AREA_SIZE;   /* bitra: + HC_DATA_BYTES of buffers for the kernel's reads (image AF) */
++#define HC_DATA_BYTES      (31u * 256 * 1024)
 +static uint8_t *hc_area = hc_area_static;   /* bitra: pages from UEFI's own memory (hc_init), where its UFS driver's list is */
  static int hc_requested;                /* ufs_native= on the command line */
  static int hc_known;                    /* UEFI's list address is kept here: check it, put it back */
  static uint32_t hc_uefi_lo, hc_uefi_hi;
-@@ -1833,11 +1994,26 @@ hc_take_back(const char *when)
+@@ -1833,11 +2001,27 @@ hc_take_back(const char *when)
  static int
  hc_init(void)
  {
@@ -254,9 +275,10 @@ index 735b9d0..6101556 100644
 +		 * Qualcomm's UFS driver keeps its list in UEFI's pool, so take the pages from UEFI too */
 +		uint64_t a = 0;
 +
-+		if (!EFI_ERROR(BS->allocate_pages(AllocateAnyPages, 4 /* EfiBootServicesData */, HC_AREA_SIZE / 4096 + 1, &a)) &&
-+		    (a & 0xfff) == 0) {
++		if (!EFI_ERROR(BS->allocate_pages(AllocateAnyPages, 4 /* EfiBootServicesData */, (HC_AREA_SIZE + HC_DATA_BYTES) / 4096 + 1,
++		    &a)) && (a & 0xfff) == 0) {
 +			hc_area = (uint8_t *)(uintptr_t)a;
++			hc_area_bytes = HC_AREA_SIZE + HC_DATA_BYTES;
 +			print("ufs: the kernel's list area is UEFI memory at %x (UEFI's own list: %x)\n", a,
 +			    (uint64_t)hc_rd(HC_UTRLBA));
 +		} else {
@@ -267,7 +289,232 @@ index 735b9d0..6101556 100644
  	lo = hc_rd(HC_UTRLBA);
  	hi = hc_rd(HC_UTRLBAU);
  	print("ufs: controller at %x: CAP %x, VER %x, HCE %x, HCS %x, IS %x, IE %x, list %x:%x, run %x, doorbell %x\n",
-@@ -1942,6 +2118,7 @@ block_start(void)
+@@ -1923,6 +2107,224 @@ block_is_darwin(const efi_partition_info *info, const efi_block_io *bio, const s
+ 	return 1;
+ }
+ 
++/*
++ * bitra: this loader's own log in RAM (a second post-mortem ring, 0xf0100000, "XNULDLOG", u32 bytes at +8, text from +64), so that
++ * a hard reset during a hardware experiment does not lose what was printed. Written out (and cleaned from the caches) by
++ * lring_sync() before each risky step. Read from Linux with tools/xnulog (pa=0xf0100000).
++ */
++static void
++lring_init(void)
++{
++	uint64_t a = 0xf0100000ULL;
++
++	if (!EFI_ERROR(BS->allocate_pages(AllocateAddress, EfiLoaderData, 256, &a))) {
++		lring = (uint8_t *)(uintptr_t)a;
++		memset(lring, 0, 64);
++		memcpy(lring, "XNULDLOG", 8);
++		clean_dcache((uint64_t)(uintptr_t)lring, (uint64_t)(uintptr_t)lring + 64);
++	}
++}
++
++static void
++lring_sync(void)
++{
++	uint32_t n = (uint32_t)log_len;
++
++	if (lring == NULL) {
++		return;
++	}
++	if (n > (1u << 20) - 64) {
++		n = (1u << 20) - 64;
++	}
++	memcpy(lring + 64, log_buf, n);
++	*(volatile uint32_t *)(lring + 8) = n;
++	clean_dcache((uint64_t)(uintptr_t)lring, (uint64_t)(uintptr_t)lring + 64 + n);
++}
++
++static int tur_requested;               /* ufs_tur=1 on the command line (bitra experiment) */
++
++/*
++ * A TEST UNIT READY through UEFI's own list and its own command descriptor, at UEFI time (this loader's memory map and
++ * caches, UEFI's driver idle), to tell whether the controller can be rung at all on this phone from outside UEFI's driver.
++ */
++static void
++hc_uefi_tur_test(void)
++{
++	uint32_t lo = hc_rd(HC_UTRLBA), hi = hc_rd(HC_UTRLBAU);
++	volatile uint32_t *l = (volatile uint32_t *)(uintptr_t)((uint64_t)hi << 32 | lo);
++	uint64_t ucd = (uint64_t)l[5] << 32 | l[4];
++	volatile uint8_t *u = (volatile uint8_t *)(uintptr_t)ucd;
++	uint32_t save[8];
++	uint8_t save_ucd[0x80];
++
++	print("uefi-tur: UEFI's list %x:%x, slot 0 %x %x %x %x %x %x %x %x\n", (uint64_t)hi, (uint64_t)lo, (uint64_t)l[0],
++	    (uint64_t)l[1], (uint64_t)l[2], (uint64_t)l[3], (uint64_t)l[4], (uint64_t)l[5], (uint64_t)l[6], (uint64_t)l[7]);
++	for (int i = 0; i < 8; i++) {
++		save[i] = l[i];
++	}
++	for (int i = 0; i < 0x80; i++) {
++		save_ucd[i] = u[i];
++	}
++	for (int i = 0; i < 0x80; i++) {
++		u[i] = 0;
++	}
++	u[0] = 0x01;                            /* COMMAND UPIU, LUN 0, tag 0, TEST UNIT READY */
++	l[0] = 0x01000000;
++	l[1] = 0;
++	l[2] = 0x0f;
++	l[3] = 0;
++	l[6] = 0x00080010;
++	l[7] = 0x00180000;
++	clean_dcache((uint64_t)(uintptr_t)l, (uint64_t)(uintptr_t)l + 32);
++	clean_dcache((uint64_t)(uintptr_t)u, (uint64_t)(uintptr_t)u + 0x80);
++	print("uefi-tur: ringing UEFI's slot 0 now (HCS %x IS %x doorbell %x run %x)\n", (uint64_t)hc_rd(HC_HCS),
++	    (uint64_t)hc_rd(HC_IS), (uint64_t)hc_rd(HC_UTRLDBR), (uint64_t)hc_rd(HC_UTRLRSR));
++	lring_sync();
++	hc_wr(HC_UTRLDBR, 1);
++	for (int ms = 0; ms < 300 && (hc_rd(HC_UTRLDBR) & 1); ms++) {
++		BS->stall(1000);
++	}
++	flush_dcache((uint64_t)(uintptr_t)l, (uint64_t)(uintptr_t)l + 32);
++	flush_dcache((uint64_t)(uintptr_t)u, (uint64_t)(uintptr_t)u + 0x80);
++	print("uefi-tur: doorbell %x IS %x OCS %x response %x %x %x %x status %x\n", (uint64_t)hc_rd(HC_UTRLDBR),
++	    (uint64_t)hc_rd(HC_IS), (uint64_t)(l[2] & 0xff), (uint64_t)u[0x40], (uint64_t)u[0x41], (uint64_t)u[0x42],
++	    (uint64_t)u[0x43], (uint64_t)u[0x47]);
++	hc_wr(HC_UTRLCNR, 1);
++	hc_wr(HC_IS, hc_rd(HC_IS) & 1);
++	for (int i = 0; i < 0x80; i++) {
++		u[i] = save_ucd[i];
++	}
++	for (int i = 0; i < 8; i++) {
++		l[i] = save[i];
++	}
++	clean_dcache((uint64_t)(uintptr_t)l, (uint64_t)(uintptr_t)l + 32);
++	clean_dcache((uint64_t)(uintptr_t)u, (uint64_t)(uintptr_t)u + 0x80);
++	print("uefi-tur: done, UEFI's slot 0 put back\n");
++	lring_sync();
++}
++
++
++/*
++ * bitra: the apps SMMU (0x15000000, SMMUv2, 87 stream groups) in front of the UFS controller (stream IDs 0xe0 and 0x4e0 in the
++ * device tree). Linux puts the controller in a translated domain; nothing here does, and a doorbell outside UEFI's driver resets the
++ * phone, so: dump the stream matching entries (smmu_dump=1) and, with smmu_bypass=1, make the entries that match the UFS stream IDs
++ * bypass (S2CR type 1) before the TEST UNIT READY.
++ */
++#define SMMU_PA 0x15000000ULL
++static int smmu_dump_requested, smmu_bypass_requested;
++
++static inline uint32_t
++smmu_rd(uint32_t off)
++{
++	return *(volatile uint32_t *)(uintptr_t)(SMMU_PA + off);
++}
++
++static void
++smmu_dump_bypass(void)
++{
++	uint32_t scr0, idr0, n, found = 0;
++
++	print("smmu: reading sCR0 at %x now\n", SMMU_PA);
++	scr0 = smmu_rd(0x0);
++	print("smmu: sCR0 read; reading IDR0\n");
++	idr0 = smmu_rd(0x20);
++	n = idr0 & 0xff;
++
++	print("smmu: sCR0 %x IDR0 %x (%d stream groups) sGFSR %x sGFSYNR0 %x\n", (uint64_t)scr0, (uint64_t)idr0, (uint64_t)n,
++	    (uint64_t)smmu_rd(0x48), (uint64_t)smmu_rd(0x50));
++	if (n > 128) {
++		n = 128;
++	}
++	for (uint32_t i = 0; i < n; i++) {
++		uint32_t smr = smmu_rd(0x800 + 4 * i), s2 = smmu_rd(0xc00 + 4 * i);
++		uint32_t id = smr & 0x7fff, mask = (smr >> 16) & 0x7fff;
++		int ufs = 0;
++
++		for (int k = 0; k < 2; k++) {
++			uint32_t sid = k ? 0x4e0 : 0xe0;
++
++			if ((smr >> 31) && (((sid ^ id) & ~mask & 0x7fff) == 0)) {
++				ufs = 1;
++			}
++		}
++		if (smr >> 31) {
++			print("smmu: %d smr %x s2cr %x%s\n", (uint64_t)i, (uint64_t)smr, (uint64_t)s2, ufs ? "  <- UFS" : "");
++		}
++		if (ufs) {
++			found++;
++			if (smmu_bypass_requested) {
++				uint32_t ns2 = (s2 & ~0x30000u) | 0x10000u;
++
++				print("smmu: writing S2CR %d: %x -> %x now\n", (uint64_t)i, (uint64_t)s2, (uint64_t)ns2);
++
++				*(volatile uint32_t *)(uintptr_t)(SMMU_PA + 0xc00 + 4 * i) = ns2;
++				__asm__ volatile ("dsb sy" ::: "memory");
++				print("smmu: %d s2cr %x -> %x (bypass)\n", (uint64_t)i, (uint64_t)s2, (uint64_t)smmu_rd(0xc00 + 4 * i));
++			}
++		}
++	}
++	print("smmu: %d entries match the UFS stream IDs\n", (uint64_t)found);
++	if (found == 0 && smmu_bypass_requested) {
++		/*
++		 * None does (image S: sCR0 USFCFG=1, 5 valid groups; UEFI's driver maps the controller only around its own commands): a
++		 * transaction of an unmatched stream is a fault, and the secure side answers a fault with a hard reset. Plain bypass is
++		 * refused here (image T: the S2CR of a bypass group reads back as fault). So: a stage 1 context bank with an identity map
++		 * of the first 16 GB (one level 1 table of 1 GB blocks), and the groups of 0xe0 and 0x4e0 translate through it.
++		 */
++		static const uint32_t sids[2] = { 0xe0, 0x4e0 };
++		uint32_t idr1 = smmu_rd(0x24), pagesize = (idr1 >> 31) ? 0x10000 : 0x1000, numcb = idr1 & 0xff;
++		uint32_t numpage = 1u << (((idr1 >> 28) & 7) + 1), cb = 0xffffffffu, next = 4;
++		uint64_t gr1 = SMMU_PA + pagesize, cbbase = SMMU_PA + (uint64_t)(numpage / 2) * pagesize, ttpa = 0;
++		uint8_t used[128] = { 0 };
++
++		print("smmu: IDR1 %x: page size %x, %d pages, %d context banks, context banks at %x\n", (uint64_t)idr1,
++		    (uint64_t)pagesize, (uint64_t)numpage, (uint64_t)numcb, cbbase);
++		for (uint32_t i = 0; i < n && i < 128; i++) {
++			uint32_t v = smmu_rd(0xc00 + 4 * i);
++
++			if (((v >> 16) & 3) == 0 && (smmu_rd(0x800 + 4 * i) >> 31) && (v & 0xff) < 128) {
++				used[v & 0xff] = 1;
++			}
++		}
++		/*
++		 * Image Y: writing SCTLR (enabling a translated bank) hangs the bus here, and reading an enabled bank does too. Linux's Qualcomm
++		 * SMMU code answers the hypervisor's refusal of bypass (image T) by reserving the LAST context bank as a bypass bank:
++		 * CBAR type 1 (stage 1 with stage 2 bypass), translation off (SCTLR.M = 0), and bypass groups get S2CR type 0 (translate) with
++		 * that bank (here 73: groups 0 and 1 are that way in Linux). So: CBAR of the last bank, no SCTLR, no table, no read back.
++		 */
++		cb = numcb - 1;
++		print("smmu: bypass bank %d (the last): writing CBAR only\n", (uint64_t)cb);
++		*(volatile uint32_t *)(uintptr_t)(gr1 + 4 * cb) = 0x10000u;
++		__asm__ volatile ("dsb sy" ::: "memory");
++		print("smmu: bypass bank %d: CBAR written\n", (uint64_t)cb);
++		(void)used; (void)ttpa; (void)cbbase;
++		for (int k = 0; k < 2; k++) {
++			while (next < n && (smmu_rd(0x800 + 4 * next) >> 31) != 0) {
++				next++;
++			}
++			if (next >= n) {
++				print("smmu: no free stream group for %x\n", (uint64_t)sids[k]);
++				break;
++			}
++			print("smmu: group %d for stream %x -> bank %d now\n", (uint64_t)next, (uint64_t)sids[k], (uint64_t)cb);
++			*(volatile uint32_t *)(uintptr_t)(SMMU_PA + 0xc00 + 4 * next) = cb;         /* S2CR: translate, the bypass bank */
++			__asm__ volatile ("dsb sy" ::: "memory");
++			*(volatile uint32_t *)(uintptr_t)(SMMU_PA + 0x800 + 4 * next) = 0x80000000u | sids[k];
++			__asm__ volatile ("dsb sy" ::: "memory");
++			print("smmu: group %d: smr %x s2cr %x\n", (uint64_t)next, (uint64_t)smmu_rd(0x800 + 4 * next),
++			    (uint64_t)smmu_rd(0xc00 + 4 * next));
++			next++;
++		}
++		*(volatile uint32_t *)(uintptr_t)(SMMU_PA + 0x68) = 0;                          /* TLB invalidate all, then sync */
++		*(volatile uint32_t *)(uintptr_t)(SMMU_PA + 0x70) = 0;
++		for (int w = 0; w < 1000 && (smmu_rd(0x74) & 1); w++) {
++			BS->stall(100);
++		}
++		print("smmu: done; sGFSR %x\n", (uint64_t)smmu_rd(0x48));
++	}
++	lring_sync();
++}
++
+ static void
+ block_start(void)
+ {
+@@ -1942,6 +2344,7 @@ block_start(void)
  
  	memset(&block_shared, 0, sizeof(block_shared));
  	block_tables();
@@ -275,7 +522,7 @@ index 735b9d0..6101556 100644
  	/* the logical units: the block devices that are not partitions of another */
  	if (!EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &blk_guid, NULL, &count, &handles))) {
  		for (uint64_t i = 0; i < count && nunits < BLOCK_MAX_UNITS; i++) {
-@@ -1964,7 +2141,34 @@ block_start(void)
+@@ -1964,7 +2367,34 @@ block_start(void)
  	}
  	if (EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &part_guid, NULL, &count, &handles))) {
  		print("ufs: no partition information: the block service is off\n");
@@ -311,7 +558,7 @@ index 735b9d0..6101556 100644
  	}
  	for (uint64_t i = 0; i < count && block_shared.parts + nunits < BLOCK_MAX_PARTS; i++) {
  		struct loader_block_part *bp = &block_shared.part[block_shared.parts];
-@@ -2022,12 +2226,13 @@ block_start(void)
+@@ -2022,12 +2452,13 @@ block_start(void)
  		block_bios[block_shared.parts++] = units[u].bio;
  	}
  	/* the kernel's own transfer list: this loader's area, if the controller is as UEFI keeps it */
@@ -324,11 +571,11 @@ index 735b9d0..6101556 100644
  		block_shared.native.hc_pa = HC_PA;
  		block_shared.native.area_pa = (uint64_t)(uintptr_t)hc_area;
 -		block_shared.native.area_size = sizeof(hc_area);
-+		block_shared.native.area_size = HC_AREA_SIZE;
++		block_shared.native.area_size = hc_area_bytes;
  		block_shared.native.ucd_offset = HC_UCD_OFFSET;
  		block_shared.native.ucd_size = HC_UCD_SIZE;
  		block_shared.native.slots = HC_SLOTS;
-@@ -2160,7 +2365,8 @@ block_poll(void)
+@@ -2160,7 +2591,8 @@ block_poll(void)
  	op = block_shared.ask.op;
  	started = READ_SYSREG(CNTVCT_EL0);
  	bytes = 0;
@@ -338,7 +585,7 @@ index 735b9d0..6101556 100644
  	    lba < block_shared.part[part].blocks && count <= block_shared.part[part].blocks - lba) {
  		efi_block_io *bio = block_bios[part];
  
-@@ -2529,6 +2735,20 @@ wdt_arm(void)
+@@ -2529,6 +2961,20 @@ wdt_arm(void)
  {
  	uint64_t ctl = 0, since = 0;
  
@@ -359,7 +606,32 @@ index 735b9d0..6101556 100644
  	if (PLAT != &platform_redwood) {
  		return; /* SMC is not routed anywhere useful on QEMU virt */
  	}
-@@ -3111,6 +3331,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3082,6 +3528,9 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+ 		block_probe_requested |= starts_with(c, "ufs_probe=1") && (c == pi.cmdline || c[-1] == ' ');
+ 		block_write_requested |= starts_with(c, "ufs_write=1") && (c == pi.cmdline || c[-1] == ' ') &&
+ 		    (c[11] == 0 || c[11] == ' ');
++		tur_requested |= starts_with(c, "ufs_tur=1") && (c == pi.cmdline || c[-1] == ' ');
++		smmu_dump_requested |= starts_with(c, "smmu_dump=1") && (c == pi.cmdline || c[-1] == ' ');
++		smmu_bypass_requested |= starts_with(c, "smmu_bypass=1") && (c == pi.cmdline || c[-1] == ' ');
+ 		hc_requested |= starts_with(c, "ufs_native=") && (c == pi.cmdline || c[-1] == ' ') && c[11] >= '1' &&
+ 		    c[11] <= '9';
+ 	}
+@@ -3097,6 +3546,14 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+ 	if (ufs_requested >= 2) {
+ 		block_start();
+ 	}
++	if (PLAT == &platform_bitra && (smmu_dump_requested || smmu_bypass_requested)) {
++		smmu_dump_bypass();
++		BS->stall(3000000ULL);
++	}
++	if (PLAT == &platform_bitra && tur_requested) {
++		hc_uefi_tur_test();
++		BS->stall(5000000ULL);
++	}
+ 	if (checkpoint == CHECKPOINT_SELFTEST) {
+ 		kernel_mpidr = this_mpidr;
+ 	}
+@@ -3111,6 +3568,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  		}
  	}
  	for (const char *c = pi.cmdline; *c; c++) {
@@ -372,9 +644,11 @@ index 735b9d0..6101556 100644
  		if (starts_with(c, "loader_return_after=")) {
  			for (c += 20; *c >= '0' && *c <= '9'; c++) {
  				kernel_budget = kernel_budget * 10 + (uint64_t)(*c - '0');
-@@ -3539,6 +3765,9 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3538,7 +4001,11 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+ 	if (kernel_mpidr != this_mpidr) {
  		print("the kernel will run on core %x (this is core %x)\n", kernel_mpidr, this_mpidr);
  	}
++	lring_sync();
  	print("jumping to %x\n", entry_va + slide);
 +	if (PLAT == &platform_bitra) {
 +		BS->stall(10000000ULL);         /* time to photograph the loader text before the kernel takes the screen */
@@ -382,7 +656,7 @@ index 735b9d0..6101556 100644
  	flush_log();
  	screen_quiet_before_run = screen_quiet;
  	screen_quiet = 1;               /* the screen is the kernel's now; the log still takes every line */
-@@ -4295,6 +4524,364 @@ ramfb_phone_screen(void)
+@@ -4295,6 +4762,364 @@ ramfb_phone_screen(void)
   * Only the kernel and a root image that fits in the payload come this way; the big Darwin system image does not
   * (docs/uefi-boot.md says what does).
   */
@@ -747,7 +1021,7 @@ index 735b9d0..6101556 100644
  static uint64_t volume_payload_bytes;           /* 0: nothing was read; else the payload's size */
  static const char *volume_payload_note;         /* why not, if it was looked for */
  
-@@ -4437,11 +5024,16 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4437,11 +5262,16 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	BS->set_watchdog_timer(0, 0, 0, NULL);
  	/* no payload in memory (nobody put one there): the volume this loader came from may have one, as a UEFI boot loader's does */
@@ -764,7 +1038,7 @@ index 735b9d0..6101556 100644
  	if (volume_payload_bytes != 0) {
  		print("payload: %d bytes from \\EFI\\hakios\\payload.bin on the volume this loader was started from\n",
  		    volume_payload_bytes);
-@@ -4462,6 +5054,8 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4462,6 +5292,8 @@ efi_main(efi_handle image, efi_system_table *st)
  		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
  		if (SCREEN.base == 0xE1000000ULL) {
  			PLAT = &platform_redwood;
@@ -773,7 +1047,7 @@ index 735b9d0..6101556 100644
  		} else if (SCREEN.base == 0xB8000000ULL) {
  			PLAT = &platform_garnet;
  		} else {
-@@ -4473,6 +5067,20 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4473,6 +5305,21 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	install_exception_hook();
  	wdt_arm();
@@ -789,6 +1063,7 @@ index 735b9d0..6101556 100644
 +				memset((void *)(uintptr_t)pm, 0, 64);
 +			}
 +		}
++		lring_init();
 +		BS->stall(10000000ULL);         /* time to photograph the firmware log lines */
 +	}
  

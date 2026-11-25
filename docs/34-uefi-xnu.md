@@ -229,3 +229,15 @@ a unit reads may go to; stop, LOEJ, every power condition and the well-known uni
 - Image AE/AF: with the stale-list check informational, the run reaches the proof (wake OK, TEST UNIT READY OK) and a READ of LUN 0: the controller says success (`OCS 0`, response `status 0`,
   residual 0, PRD target 1_02acc000, 4096 bytes, a correct READ(10) of LBA 1), but the whole 256 KB buffer stays zero. So the data DMA does not arrive where the CPU looks. Suspects:
   the buffer is above 4 GB and cached. Image AG: the data buffers are in the loader's UEFI area (below 4 GB, mapped uncached, behind the lists).
+
+## iOS 16.5 root volume boots from the phone's UFS `darwin` partition (2026-11-25, image AG)
+Image AG (`root_apfs=ufs_darwin ufs=2 ufs_native=1 smmu_bypass=1 cpus=1`, kernel with `CONFIG_HAKIOS_UFS`, loader with the SMMU bypass bank and the DMA buffers in its UEFI area):
+`unit0 is LUN 0: its GPT header read natively`, then the kernel's own driver serves `/dev/ufs_darwin`: `apfs: volume 0 "SydneyF20F66.D22D221OS" ... 142299 files, 136413 directories`
+mounts read only as the iOS volume, the root is switched onto it, the System Cryptex (container 1 at 5368 MB) and the App Cryptex (container 2 at 7968 MB) mount, `=== 45 checks, 0 failed ===`.
+Then `exec /sbin/launchd.darwin: No such file or directory` and the kernel halts (cleanly: the phone returns to Alpine). Nothing was written to the phone (`ufs_write` off).
+What it took, in order: (1) gzip payload; (2) Mu's UFSDxe exposes no Block I/O, so the kernel's own UFS driver (`ufs_native`) with a table from the loader; (3) a post-mortem log in RAM (kernel `0xf0000000`,
+loader `0xf0100000`; `tools/xnulog`) since the failures were hard resets; (4) the resets were the apps SMMU (`0x15000000`): `sCR0.USFCFG=1` and no stream group for the UFS stream IDs 0xe0/0x4e0, so
+the controller's first DMA faulted; plain S2CR bypass is refused, enabling a translated context bank hangs the bus; Linux's own trick works (the last context bank, 73, with `CBAR` type 1 and `SCTLR.M` 0,
+bypass groups with S2CR type 0 -> that bank); (5) the unit answered `2/04/02` until the **UFS device was woken** (START STOP UNIT to well-known unit 0xD0, ACTIVE; one new opcode in the driver's
+whitelist, narrow, self-tested); (6) UEFI's list memory is stale (freed and reused), so its content is only said; (7) read data never arrived in kernel memory above 4 GB (cached): buffers are in the loader's UEFI pages (below 4 GB, uncached).
+Open: why (7) (address above 4 GB or the cache attributes) is not known; throughput not measured (uncached 256 KB slots); `bootcpu=7` still resets; `launchd.darwin`; the SMMU bank and groups are set by the loader (`smmu_bypass=1`), not the kernel.

@@ -49,6 +49,10 @@ index bae6bc7..9859115 100644
  
    #
    # Platform PEI
+diff --git a/Platforms/Realme/bitraPkg/hakios/loader.efi b/Platforms/Realme/bitraPkg/hakios/loader.efi
+new file mode 100755
+index 0000000..05a2b32
+Binary files /dev/null and b/Platforms/Realme/bitraPkg/hakios/loader.efi differ
 diff --git a/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c b/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c
 index 3a0a8a2..23ee590 100644
 --- a/Silicon/Qualcomm/QcomPkg/Library/PlatformBootOptionsLib/PlatformBootOptions.c

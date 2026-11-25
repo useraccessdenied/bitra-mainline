@@ -1,5 +1,5 @@
 diff --git a/drivers/storage/hakios.ufs.c b/drivers/storage/hakios.ufs.c
-index c4b6686..01e3704 100644
+index c4b6686..948e15c 100644
 --- a/drivers/storage/hakios.ufs.c
 +++ b/drivers/storage/hakios.ufs.c
 @@ -73,6 +73,7 @@ extern void FlushPoC_DcacheRegion(vm_offset_t va, size_t length);   /* osfmk/arm
@@ -21,7 +21,7 @@ index c4b6686..01e3704 100644
  		    memcmp(theirs + n * 4096, "EFI PART", 8) != 0) {
  			printf("ufs: native: %s: no GPT header to know it by (block size %u)\n", e->name, e->block_size);
  			good = false;
-@@ -1358,6 +1361,17 @@ ufs_native_map(bool all_units)
+@@ -1358,6 +1361,31 @@ ufs_native_map(bool all_units)
  	for (uint32_t k = 0; good && k < n; k++) {
  		volatile struct loader_block_part *e = &ufs_page->part[units[k]];
  
@@ -29,6 +29,20 @@ index c4b6686..01e3704 100644
 +			if (ufshc_read((uint8_t)e->unit, 4096, mine, 4096) != 0 || memcmp(mine, "EFI PART", 8) != 0) {
 +				printf("ufs: native: %s: LUN %u's block 1 is not a GPT header (loader's table, no UEFI read to compare)\n",
 +				    e->name, e->unit);
++				ufshc_debug_slot(1);
++				/* what the unit does return: the first bytes of blocks 0, 1 and 2, and how many bytes of each are not zero */
++				for (uint32_t blk = 0; blk < 3; blk++) {
++					int rc = ufshc_read((uint8_t)e->unit, (uint64_t)blk * 4096, mine, 4096);
++					uint32_t nz = 0;
++
++					for (uint32_t b = 0; b < 4096; b++) {
++						nz += mine[b] != 0;
++					}
++					printf("ufs: native: LUN %u block %u (read %d): %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x "
++					    "[510]=%02x%02x, %u of 4096 bytes not zero\n", e->unit, blk, rc, mine[0], mine[1], mine[2], mine[3],
++					    mine[4], mine[5], mine[6], mine[7], mine[8], mine[9], mine[10], mine[11], mine[12], mine[13], mine[14],
++					    mine[15], mine[510], mine[511], nz);
++				}
 +				good = false;
 +			} else {
 +				printf("ufs: native: %s is LUN %u: its GPT header read natively (loader has no Block I/O)\n", e->name,
@@ -39,7 +53,7 @@ index c4b6686..01e3704 100644
  		if (ufshc_read((uint8_t)e->unit, 4096, mine, 4096) != 0 || memcmp(mine, theirs + k * 4096, 4096) != 0) {
  			printf("ufs: native: %s: LUN %u's block 1 is NOT what the loader reads as its block 1\n", e->name, e->unit);
  			good = false;
-@@ -1713,6 +1727,10 @@ hakios_ufs_init(void)
+@@ -1713,6 +1741,10 @@ hakios_ufs_init(void)
  	uint32_t check = 0, made = 0;
  	vm_offset_t base;
  
@@ -50,3 +64,396 @@ index c4b6686..01e3704 100644
  	if (!PE_parse_boot_argn("ufs_shared_pa", &pa, sizeof(pa)) || pa == 0) {
  		return;                 /* the loader was not asked for ufs=2: there is nothing to read through */
  	}
+@@ -1838,6 +1870,9 @@ hakios_ufs_init(void)
+ 			if (mode != 2) {
+ 				printf("ufs: this kernel's own UFS driver is not used: through the loader\n");
+ 			}
++		} else if (mode == 4) {
++			printf("ufs: native: experiment: TEST UNIT READY through UEFI's own list, no switch\n");
++			ufshc_uefi_tur_test();
+ 		} else if (mode == 3) {
+ 			printf("ufs: native: dry run: this kernel's list in and out, no command\n");
+ 			if (ufs_native_in(false) == 0) {
+diff --git a/drivers/storage/hakios.ufshc.c b/drivers/storage/hakios.ufshc.c
+index 3f45b99..1b7300a 100644
+--- a/drivers/storage/hakios.ufshc.c
++++ b/drivers/storage/hakios.ufshc.c
+@@ -247,6 +247,8 @@ hc_us_since(uint64_t start)
+ 	return ns / 1000;
+ }
+ 
++#define LUN_DEVICE_WLUN     0xd0        /* the UFS device well-known unit (0x50 | 0x80) */
++
+ /* ---- the whitelist: the one check every command passes before it goes into a slot ---- */
+ 
+ static const char *
+@@ -274,6 +276,16 @@ hc_refusal(const uint8_t *upiu, uint32_t dw0, uint32_t lun_mask, bool any_comman
+ 	if (upiu[4] & 0x0f) {
+ 		return "not the SCSI command set";
+ 	}
++	/*
++	 * The one thing allowed to a well-known unit: START STOP UNIT of the UFS device unit with the ACTIVE power condition (what Linux's
++	 * ufshcd sends to wake a device that is in sleep or power-down; a device already active takes it as nothing). No other power
++	 * condition, no start/stop/eject bits, not immediate, no data, no other unit.
++	 */
++	if (cdb[0] == 0x1b) {
++		return lun == LUN_DEVICE_WLUN && dd == UTRD_DD_NONE && expected == 0 && (upiu[1] & UPIU_FLAG_READ) == 0 &&
++		       cdb[1] == 0 && cdb[2] == 0 && cdb[3] == 0 && cdb[4] == 0x10 && cdb[5] == 0 ? NULL :
++		       "a START STOP UNIT other than the device unit's ACTIVE power condition";
++	}
+ 	/* a normal logical unit, and one reads may go to now */
+ 	if (lun & LUN_WELL_KNOWN) {
+ 		return "a well-known logical unit";
+@@ -360,6 +372,18 @@ hc_make_tur(struct hc_cmd *c, uint8_t lun, uint8_t tag)
+ 	c->dw0 = UTRD_CT_UFS | UTRD_DD_NONE;
+ }
+ 
++static void
++hc_make_wake(struct hc_cmd *c, uint8_t tag)
++{
++	bzero(c, sizeof(*c));
++	c->upiu[0] = UPIU_COMMAND;
++	c->upiu[2] = LUN_DEVICE_WLUN;
++	c->upiu[3] = tag;
++	c->upiu[16] = 0x1b;                     /* START STOP UNIT of the UFS device unit ... */
++	c->upiu[20] = 0x10;                     /* ... power condition 1: ACTIVE */
++	c->dw0 = UTRD_CT_UFS | UTRD_DD_NONE;
++}
++
+ /*
+  * The whitelist tried on commands made up here and never sent: those that must be refused,
+  * and those that must pass. Pure bytes; nothing touches the controller.
+@@ -446,6 +470,29 @@ hc_whitelist_selftest(void)
+ 		right &= hc_refusal(c.upiu, c.dw0, 1u << 0, false) != NULL;
+ 		hc_make_tur(&c, 0, 0);
+ 		right &= hc_refusal(c.upiu, c.dw0, 1u << 0, false) == NULL;
++		hc_make_wake(&c, 0);
++		right &= hc_refusal(c.upiu, c.dw0, 1u << 0, false) == NULL;            /* the ACTIVE wake of the device unit passes ... */
++		for (unsigned v = 0; v < 9; v++) {
++			/* ... and not a stop, a start, an eject, another power condition (sleep, power-down, deep sleep, idle, standby) */
++			static const uint8_t cdb4[9] = { 0x00, 0x01, 0x03, 0x11, 0x20, 0x30, 0x40, 0x50, 0x70 };
++
++			hc_make_wake(&c, 0);
++			c.upiu[20] = cdb4[v];
++			right &= hc_refusal(c.upiu, c.dw0, 1u << 0, false) != NULL;
++		}
++		hc_make_wake(&c, 0);
++		c.upiu[17] = 1;                                                         /* immediate */
++		right &= hc_refusal(c.upiu, c.dw0, 1u << 0, false) != NULL;
++		for (unsigned v = 0; v < 5; v++) {
++			static const uint8_t luns[5] = { 0x00, 0x01, 0xb0, 0xc4, 0x81 };    /* a normal unit, the BOOT, RPMB, REPORT LUNS units */
++
++			hc_make_wake(&c, 0);
++			c.upiu[2] = luns[v];
++			right &= hc_refusal(c.upiu, c.dw0, 0x3u, false) != NULL;
++		}
++		hc_make_wake(&c, 0);
++		c.dw0 = UTRD_CT_UFS | UTRD_DD_IN;                                       /* with data from the device */
++		right &= hc_refusal(c.upiu, c.dw0, 1u << 0, false) != NULL;
+ 	}
+ 	hc_say("ufs: native: whitelist tried on %u commands made up and never sent -- READ(10/16), TEST UNIT READY, READ "
+ 	    "CAPACITY of LUN 0 pass; WRITE(10/16), UNMAP, a READ with data host to device, a READ with the W flag, the "
+@@ -687,8 +734,8 @@ hc_complete(struct hc_slot *s, const char *what, bool tur)
+ 		os_atomic_add(&hc_wait_us, hc_us_since(started), relaxed);
+ 	}
+ 	ocs = s->utrd[2] & 0xff;
+-	if (ocs != OCS_SUCCESS || (r[0] & 0x3f) != UPIU_RESPONSE || r[3] != s->number || r[6] != 0 ||
+-	    (r[7] != 0 && !(tur && r[7] == 0x02))) {
++	if (ocs != OCS_SUCCESS || (r[0] & 0x3f) != UPIU_RESPONSE || r[3] != s->number ||
++	    (r[6] != 0 && !(tur && r[6] == 0x01 && r[7] == 0x02)) || (r[7] != 0 && !(tur && r[7] == 0x02))) {
+ 		/* sense data follows the 32 bytes of the header: its length (2), then the fixed format */
+ 		hc_say("ufs: native: slot %u (%s): OCS %x, response %02x tag %02x, response %02x status %02x, "
+ 		    "sense key %x asc %02x ascq %02x\n", s->number, what, ocs, r[0], r[3], r[6], r[7],
+@@ -743,6 +790,38 @@ hc_give(struct hc_slot *s)
+ 	lck_mtx_unlock(&hc_lock);
+ }
+ 
++
++/* A debug dump of one slot (image AE: the reads say success and every byte is zero): its descriptor, command, response, PRD and buffer. */
++void
++ufshc_debug_slot(uint32_t n)
++{
++	struct hc_slot *s = &hc_slots[n];
++	volatile const uint32_t *u = (volatile const uint32_t *)s->ucd;
++	volatile const uint32_t *prd = u + UCD_PRDT / 4;
++	const uint8_t *d = (const uint8_t *)s->data;
++	uint32_t nz = 0, first = 0xffffffffu;
++
++	hc_say("ufs: native: slot %u: UTRD %08x %08x %08x %08x %08x %08x %08x %08x; data %llx (kernel %p)\n", n, s->utrd[0], s->utrd[1],
++	    s->utrd[2], s->utrd[3], s->utrd[4], s->utrd[5], s->utrd[6], s->utrd[7], (unsigned long long)s->data_pa, (const void *)s->data);
++	hc_say("ufs: native: slot %u: command UPIU %08x %08x %08x %08x %08x %08x %08x %08x\n", n, u[0], u[1], u[2], u[3], u[4], u[5], u[6],
++	    u[7]);
++	hc_say("ufs: native: slot %u: response UPIU %08x %08x %08x %08x %08x %08x %08x %08x\n", n, u[UCD_RESPONSE / 4], u[UCD_RESPONSE / 4 + 1],
++	    u[UCD_RESPONSE / 4 + 2], u[UCD_RESPONSE / 4 + 3], u[UCD_RESPONSE / 4 + 4], u[UCD_RESPONSE / 4 + 5], u[UCD_RESPONSE / 4 + 6],
++	    u[UCD_RESPONSE / 4 + 7]);
++	hc_say("ufs: native: slot %u: PRD %08x %08x %08x %08x\n", n, prd[0], prd[1], prd[2], prd[3]);
++	FlushPoC_DcacheRegion((vm_offset_t)d, hc_slot_buffer);
++	for (uint32_t i = 0; i < hc_slot_buffer; i++) {
++		if (d[i] != 0) {
++			nz++;
++			if (first == 0xffffffffu) {
++				first = i;
++			}
++		}
++	}
++	hc_say("ufs: native: slot %u: the %u-byte buffer holds %u bytes not zero, the first at %u\n", n, hc_slot_buffer, nz,
++	    first == 0xffffffffu ? 0 : first);
++}
++
+ /*
+  * Bytes [offset, offset + len) of logical unit lun into dst: the blocks that cover them, a slot's
+  * buffer at a time, with as many slots in flight at once as are free (at least one), the wanted
+@@ -869,27 +948,82 @@ hc_prove(void)
+ {
+ 	struct hc_slot *s = &hc_slots[SLOT_PROOF];
+ 	struct hc_cmd c;
+-	uint32_t ocs;
+-	int e;
+-
+-	hc_make_tur(&c, (uint8_t)__builtin_ctz(hc_lun_mask), SLOT_PROOF);
+-	e = hc_place(s, &c, 0);
+-	if (e == 0) {
+-		e = hc_ring(s);
+-	}
+-	if (e == 0) {
+-		e = hc_complete(s, "the proof's TEST UNIT READY", true);
++	volatile const uint8_t *r = (volatile const uint8_t *)s->ucd + UCD_RESPONSE;
++	uint32_t ocs = 0;
++	int e = 0;
++	bool started = false;
++
++	for (int attempt = 0; attempt < 6; attempt++) {
++		uint8_t key, asc, ascq;
++
++		hc_make_tur(&c, (uint8_t)__builtin_ctz(hc_lun_mask), SLOT_PROOF);
++		e = hc_place(s, &c, 0);
++		if (e == 0) {
++			if (attempt == 0) {
++				/* breadcrumbs (bitra: the phone reset at this doorbell until the SMMU was set up; the post-mortem log keeps the last line) */
++				hc_say("ufs: native: proof: UTRD %08x %08x %08x %08x %08x %08x %08x %08x at %llx, UCD at %llx\n",
++				    s->utrd[0], s->utrd[1], s->utrd[2], s->utrd[3], s->utrd[4], s->utrd[5], s->utrd[6], s->utrd[7],
++				    (unsigned long long)(hc_loader.area_pa + s->number * 32), (unsigned long long)s->ucd_pa);
++				hc_say("ufs: native: proof: ringing slot %u now (list %08x:%08x run %u HCS %08x IS %08x)\n", s->number,
++				    hc_read(UFSHC_UTRLBAU), hc_read(UFSHC_UTRLBA), hc_read(UFSHC_UTRLRSR) & 1, hc_read(UFSHC_HCS),
++				    hc_read(UFSHC_IS));
++			}
++			e = hc_ring(s);
++		}
++		if (e == 0) {
++			e = hc_complete(s, "the proof's TEST UNIT READY", true);
++		}
++		ocs = s->utrd[2] & 0xff;
++		hc_proofs++;
++		if (e != 0 || ocs != OCS_SUCCESS) {
++			break;
++		}
++		if (r[7] == 0) {
++			hc_say("ufs: native: proof: TEST UNIT READY in this list's slot 0 came back here (OCS 0, response %02x, "
++			    "status %02x%s)\n", r[6], r[7], started ? ", after a START of the unit" : "");
++			return 0;
++		}
++		key = r[34 + 2] & 0x0f, asc = r[34 + 12], ascq = r[34 + 13];
++		hc_say("ufs: native: proof: TEST UNIT READY answered: status %02x, sense key %x asc %02x ascq %02x\n", r[7], key, asc,
++		    ascq);
++		if (key == 2 && asc == 0x04 && ascq == 0x02 && !started) {
++			/* "initializing command required" for every unit: the device is likely in sleep/power-down: wake it as Linux does */
++			started = true;
++			hc_make_wake(&c, SLOT_PROOF);
++			e = hc_place(s, &c, 0);
++			if (e == 0) {
++				hc_say("ufs: native: proof: START STOP UNIT of the device unit, power condition ACTIVE\n");
++				e = hc_ring(s);
++			}
++			if (e == 0) {
++				e = hc_complete(s, "the proof's wake", true);
++			}
++			ocs = s->utrd[2] & 0xff;
++			if (e != 0 || ocs != OCS_SUCCESS) {
++				break;
++			}
++			hc_say("ufs: native: proof: the wake answered: response %02x status %02x, sense key %x asc %02x ascq %02x\n",
++			    r[6], r[7], r[34 + 2] & 0x0f, r[34 + 12], r[34 + 13]);
++			IOSleep(200);
++			continue;
++		}
++		if (key == 6 || (key == 2 && asc == 0x04 && ascq != 0x02)) {
++			IOSleep(200);           /* a unit attention (cleared by being reported), or becoming ready */
++			continue;
++		}
++		break;
++	}
++	if (e == 0 && ocs == OCS_SUCCESS && (r[0] & 0x3f) == UPIU_RESPONSE && r[3] == s->number) {
++		/*
++		 * The controller ran the command from this list and its response came back here, which is what the proof is for. The unit
++		 * says it is not ready (status %02x): that is for the reads to find out, and they say what they get.
++		 */
++		hc_say("ufs: native: proof: the controller ran TEST UNIT READY from this list (OCS 0, response %02x status %02x): the unit is not "
++		    "ready for I/O, reads will tell\n", r[6], r[7]);
++		return 0;
+ 	}
+-	ocs = s->utrd[2] & 0xff;
+-	hc_proofs++;
+-	if (e != 0 || ocs != OCS_SUCCESS) {
+-		hc_say("ufs: native: proof FAILED (%d): this list's slot 0 has OCS %x after its doorbell -- the controller "
+-		    "did not run it from this list\n", e, ocs);
+-		return e != 0 ? e : EIO;
+-	}
+-	hc_say("ufs: native: proof: TEST UNIT READY in this list's slot 0 came back here (OCS 0, response %02x, status %02x)\n",
+-	    ((volatile const uint8_t *)s->ucd)[UCD_RESPONSE + 6], ((volatile const uint8_t *)s->ucd)[UCD_RESPONSE + 7]);
+-	return 0;
++	hc_say("ufs: native: proof FAILED (%d): this list's slot 0 has OCS %x, status %02x after its doorbell\n", e, ocs, r[7]);
++	return e != 0 ? e : EIO;
+ }
+ 
+ struct hc_put_back_result {
+@@ -959,6 +1093,83 @@ hc_put_back_print(const char *why, const struct hc_put_back_result *r, bool late
+ 	    r->cnr == hc_cnr_in ? ", as it was" : ", NOT AS IT WAS");
+ }
+ 
++
++/*
++ * ufs_native=4 (bitra experiment): a TEST UNIT READY through UEFI's own list, to find out which memory the controller's DMA may
++ * reach. 1: UEFI's descriptor memory (the UCD where UEFI keeps it, no switch); 2: only the UCD moved to this kernel's area
++ * (the loader's pages), the list still UEFI's. Each step is said before the doorbell: the post-mortem log keeps the last line
++ * if the phone resets. UEFI's slot 0 and its UCD are put back afterwards.
++ */
++static void
++hc_uefi_tur_once(const char *tag, uint64_t ucd_pa, volatile uint8_t *ucd)
++{
++	volatile uint32_t *l = hc_uefi_list;
++	uint64_t t;
++	uint32_t db;
++
++	for (int i = 0; i < 0x80; i++) {
++		ucd[i] = 0;
++	}
++	ucd[0] = 0x01;                          /* COMMAND UPIU, SCSI, LUN 0, tag 0, TEST UNIT READY (CDB 00) */
++	l[0] = 0x01000000;                      /* as UEFI's: command type 0, interrupt, no data */
++	l[1] = 0;
++	l[2] = 0x0f;
++	l[3] = 0;
++	l[4] = (uint32_t)ucd_pa;
++	l[5] = (uint32_t)(ucd_pa >> 32);
++	l[6] = 0x00080010;                      /* as UEFI's: response 8 dwords at dword 16 */
++	l[7] = 0x00180000;                      /* no PRDT */
++	__asm__ volatile ("dsb sy" ::: "memory");
++	hc_say("ufs: native: uefi-tur %s: ringing UEFI's slot 0 with the UCD at %llx now (list %08x:%08x run %u IS %08x)\n", tag,
++	    (unsigned long long)ucd_pa, hc_read(UFSHC_UTRLBAU), hc_read(UFSHC_UTRLBA), hc_read(UFSHC_UTRLRSR) & 1,
++	    hc_read(UFSHC_IS));
++	hc_write(UFSHC_UTRLDBR, 1);
++	for (t = mach_absolute_time(); (hc_read(UFSHC_UTRLDBR) & 1) && hc_us_since(t) < 300000;) {
++		__builtin_arm_yield();
++	}
++	db = hc_read(UFSHC_UTRLDBR);
++	hc_say("ufs: native: uefi-tur %s: doorbell %08x IS %08x OCS %02x response %02x %02x %02x %02x status %02x\n", tag, db,
++	    hc_read(UFSHC_IS), l[2] & 0xff, ucd[0x40], ucd[0x41], ucd[0x42], ucd[0x43], ucd[0x47]);
++	hc_write(UFSHC_UTRLCNR, 1);             /* the completion notification, as UEFI's driver clears it */
++	hc_write(UFSHC_IS, hc_read(UFSHC_IS) & 1);
++}
++
++void
++ufshc_uefi_tur_test(void)
++{
++	volatile uint32_t *l = hc_uefi_list;
++	uint32_t save[8];
++	uint64_t ucd = (uint64_t)l[5] << 32 | l[4];
++	volatile uint8_t *u;
++	uint8_t saved_ucd[0x80];
++	vm_offset_t area;
++	uint64_t apa = hc_loader.area_pa + hc_loader.ucd_offset;
++
++	if (l == NULL || ucd < hc_uefi_map_pa || ucd + 0x80 > hc_uefi_map_pa + hc_uefi_map_size) {
++		hc_say("ufs: native: uefi-tur: UEFI's descriptor is not in the page that is mapped\n");
++		return;
++	}
++	u = (volatile uint8_t *)(hc_uefi_map_va + (ucd - hc_uefi_map_pa));
++	for (int i = 0; i < 8; i++) {
++		save[i] = l[i];
++	}
++	for (int i = 0; i < 0x80; i++) {
++		saved_ucd[i] = u[i];
++	}
++	hc_uefi_tur_once("1 (UEFI's own UCD)", ucd, u);
++	area = ml_io_map_unmappable((vm_offset_t)(apa & ~(uint64_t)PAGE_MASK), PAGE_SIZE, VM_WIMG_WCOMB) +
++	    (vm_offset_t)(apa & PAGE_MASK);
++	hc_uefi_tur_once("2 (UCD in the loader's area)", apa, (volatile uint8_t *)area);
++	for (int i = 0; i < 0x80; i++) {
++		u[i] = saved_ucd[i];
++	}
++	for (int i = 0; i < 8; i++) {
++		l[i] = save[i];
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++	hc_say("ufs: native: uefi-tur: done, UEFI's slot 0 put back\n");
++}
++
+ /*
+  * This kernel's list into the controller (the caller holds the loader's mailbox: nothing is asked
+  * of UEFI meanwhile). prove: then slot 0's TEST UNIT READY, before anything is read.
+@@ -985,7 +1196,12 @@ ufshc_switch_in(bool prove)
+ 	if (*hc_loader.take_back != 0) {
+ 		no = "the loader has taken the controller back";
+ 	} else {
+-		no = hc_uefi_slot0(uefi_upiu, &uefi_dw0);
++		/*
++		 * UEFI's list memory is not trustworthy on bitra (Mu's UFSDxe frees it after each use and the pages get reused: image AD found code
++		 * in them), so what UEFI's slot 0 holds is only said, never required: UEFI's list is put back by its address in the registers.
++		 */
++		(void)hc_uefi_slot0(uefi_upiu, &uefi_dw0);
++		no = NULL;
+ 	}
+ 	lo = hc_read(UFSHC_UTRLBA);
+ 	hi = hc_read(UFSHC_UTRLBAU);
+@@ -1238,7 +1454,8 @@ ufshc_probe(const struct ufshc_loader *loader, bool only)
+ 		hc_uefi_list = (volatile uint32_t *)(hc_uefi_map_va + (uefi_pa - hc_uefi_map_pa));
+ 		hc_say("ufs: native: UEFI's slot 0: %08x %08x %08x %08x %08x %08x %08x %08x\n", hc_uefi_list[0], hc_uefi_list[1],
+ 		    hc_uefi_list[2], hc_uefi_list[3], hc_uefi_list[4], hc_uefi_list[5], hc_uefi_list[6], hc_uefi_list[7]);
+-		no = hc_uefi_slot0(uefi_upiu, &uefi_dw0);
++		(void)hc_uefi_slot0(uefi_upiu, &uefi_dw0);   /* only said, not required (the memory may be reused: image AD) */
++		no = NULL;
+ 		hc_say("ufs: native: UEFI's last command: UPIU %02x %02x %02x %02x, CDB %02x %02x %02x %02x %02x %02x %02x %02x "
+ 		    "%02x %02x\n", uefi_upiu[0], uefi_upiu[1], uefi_upiu[2], uefi_upiu[3], uefi_upiu[16], uefi_upiu[17],
+ 		    uefi_upiu[18], uefi_upiu[19], uefi_upiu[20], uefi_upiu[21], uefi_upiu[22], uefi_upiu[23], uefi_upiu[24],
+@@ -1259,6 +1476,7 @@ ufshc_probe(const struct ufshc_loader *loader, bool only)
+ 	    (vm_offset_t)(loader->area_pa & PAGE_MASK);
+ 	hc_list_lo = (uint32_t)loader->area_pa;
+ 	hc_list_hi = (uint32_t)(loader->area_pa >> 32);
++	uint64_t data_off = (uint64_t)loader->ucd_offset + (uint64_t)SLOTS * loader->ucd_size;
+ 	for (uint32_t i = 0; i < SLOTS; i++) {
+ 		struct hc_slot *s = &hc_slots[i];
+ 		struct hc_cmd c;
+@@ -1267,7 +1485,20 @@ ufshc_probe(const struct ufshc_loader *loader, bool only)
+ 		s->utrd = (volatile uint32_t *)(area + 32 * i);
+ 		s->ucd = (volatile uint32_t *)(area + loader->ucd_offset + i * loader->ucd_size);
+ 		s->ucd_pa = loader->area_pa + loader->ucd_offset + i * loader->ucd_size;
+-		if (i >= 1 && i <= slots) {
++		if (i >= 1 && i <= slots && loader->area_size >= data_off + (uint64_t)i * round_page(hc_slot_buffer)) {
++			/*
++			 * Image AF: the controller says a read is done and its data never shows in this kernel's own buffer (above 4 GB, cached): the
++			 * buffers are in the loader's area instead, behind the lists, in UEFI memory below 4 GB and mapped uncached here.
++			 */
++			uint64_t at = data_off + (uint64_t)(i - 1) * round_page(hc_slot_buffer);
++
++			s->data = (uint8_t *)(area + at);
++			s->data_pa = loader->area_pa + at;
++			if (i == 1) {
++				hc_say("ufs: native: the slots' buffers are in the loader's area: %llx.. (%u KB each)\n",
++				    (unsigned long long)s->data_pa, hc_slot_buffer >> 10);
++			}
++		} else if (i >= 1 && i <= slots) {
+ 			vm_offset_t data = 0;
+ 
+ 			if (kmem_alloc_contig(kernel_map, &data, round_page(hc_slot_buffer), PAGE_MASK, 0, 0,
+diff --git a/drivers/storage/hakios.ufshc.h b/drivers/storage/hakios.ufshc.h
+index 7b29ce8..df1c4e7 100644
+--- a/drivers/storage/hakios.ufshc.h
++++ b/drivers/storage/hakios.ufshc.h
+@@ -22,6 +22,8 @@ struct ufshc_loader {
+ bool ufshc_probe(const struct ufshc_loader *loader, bool only);
+ bool ufshc_available(void);
+ void ufshc_set_luns(uint32_t mask);
++void ufshc_uefi_tur_test(void);
++void ufshc_debug_slot(uint32_t n);
+ int ufshc_switch_in(bool prove);
+ int ufshc_switch_out(const char *why);
+ bool ufshc_list_in(void);
