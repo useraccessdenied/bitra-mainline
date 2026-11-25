@@ -1,5 +1,5 @@
 diff --git a/drivers/storage/hakios.ufs.c b/drivers/storage/hakios.ufs.c
-index c4b6686..9bea30f 100644
+index c4b6686..01e3704 100644
 --- a/drivers/storage/hakios.ufs.c
 +++ b/drivers/storage/hakios.ufs.c
 @@ -73,6 +73,7 @@ extern void FlushPoC_DcacheRegion(vm_offset_t va, size_t length);   /* osfmk/arm
@@ -39,3 +39,14 @@ index c4b6686..9bea30f 100644
  		if (ufshc_read((uint8_t)e->unit, 4096, mine, 4096) != 0 || memcmp(mine, theirs + k * 4096, 4096) != 0) {
  			printf("ufs: native: %s: LUN %u's block 1 is NOT what the loader reads as its block 1\n", e->name, e->unit);
  			good = false;
+@@ -1713,6 +1727,10 @@ hakios_ufs_init(void)
+ 	uint32_t check = 0, made = 0;
+ 	vm_offset_t base;
+ 
++	{
++		extern void hakios_pm_map(void);
++		hakios_pm_map();        /* post-mortem log in RAM (osfmk/console/video_console.c) */
++	}
+ 	if (!PE_parse_boot_argn("ufs_shared_pa", &pa, sizeof(pa)) || pa == 0) {
+ 		return;                 /* the loader was not asked for ufs=2: there is nothing to read through */
+ 	}

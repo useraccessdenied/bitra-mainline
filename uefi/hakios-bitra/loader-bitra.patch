@@ -18,7 +18,7 @@ index 2d35c83..cf9f9b7 100644
  typedef struct {
  	uint32_t type; uint32_t pad; uint64_t phys_start; uint64_t virt_start; uint64_t pages; uint64_t attribute;
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..98c4371 100644
+index 735b9d0..6101556 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
 @@ -347,6 +347,68 @@ static int hc_log_skips;                /* logs not written this run (said twice
@@ -773,12 +773,22 @@ index 735b9d0..98c4371 100644
  		} else if (SCREEN.base == 0xB8000000ULL) {
  			PLAT = &platform_garnet;
  		} else {
-@@ -4473,6 +5067,10 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4473,6 +5067,20 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	install_exception_hook();
  	wdt_arm();
 +	if (PLAT == &platform_bitra) {
 +		show_firmware_log();
++		{
++			/* the kernel's post-mortem log ring (osfmk/console/video_console.c, PM_PA): taken from UEFI so nothing else uses it */
++			uint64_t pm = 0xf0000000ULL;
++			efi_status ps = BS->allocate_pages(AllocateAddress, EfiLoaderData, 256, &pm);
++
++			print("postmortem log ring at f0000000: %s\n", EFI_ERROR(ps) ? "NOT reserved (in use)" : "reserved");
++			if (!EFI_ERROR(ps)) {
++				memset((void *)(uintptr_t)pm, 0, 64);
++			}
++		}
 +		BS->stall(10000000ULL);         /* time to photograph the firmware log lines */
 +	}
  
