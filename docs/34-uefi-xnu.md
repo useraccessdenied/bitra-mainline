@@ -142,3 +142,14 @@ address as SM8250's `ufshc`), so the way forward is `ufs_native=1`, but the kern
 `ufs_shared_pa` page) is built from the loader's BlockIo survey. For bitra the loader must instead publish a
 synthetic unit list (LUN 0, 4096-byte blocks, 61,777,920 blocks) or the kernel must probe LUNs itself.
 Also unknown: whether the controller's DMA (SMMU config) lets it reach the loader's `hc_area`.
+
+## Images I and J: the kernel's own UFS driver on bitra (2026-11-25, built, not yet run)
+- Kernel rebuilt with `CONFIG_HAKIOS_UFS=y` (`devices/bitra/configs/bitra.config`; the first bitra kernel had no UFS code at all).
+- Loader (bitra, `ufs=2 ufs_native=1`, no PartitionInfo): publishes its own table, unit0 (LUN 0, 61,777,920 blocks of 4096) and
+  `darwin` (start 19,460,616, 16,777,216 blocks, from `backups/gpt-20261124/gpt-after.sfdisk`), flagged `BLOCK_PART_SYNTH`, and offers
+  the controller (0x1d84000) with its `hc_area`. UEFI's transfer list is kept and put back as before. Read only (`ufs_write` off).
+- Kernel (`hakios.ufs.c`): for synthetic units the native map has no loader read to compare with, so it reads LBA 1 of the unit with
+  its own driver and requires `EFI PART`.
+- I = `root_apfs=ufs_darwin ufs=2 ufs_native=1 bootcpu=7 cpus=1`; J = the same without `bootcpu=7` (in case core 7 does not start).
+  Both gzip payloads (5.7 MB). Unknown until run: whether the controller's DMA (SMMU) can reach `hc_area`.
+- Patches: `loader-bitra.patch`, `kernel-ufs-bitra.patch`.

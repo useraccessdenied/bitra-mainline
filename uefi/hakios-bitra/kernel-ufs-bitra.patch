@@ -1,0 +1,41 @@
+diff --git a/drivers/storage/hakios.ufs.c b/drivers/storage/hakios.ufs.c
+index c4b6686..9bea30f 100644
+--- a/drivers/storage/hakios.ufs.c
++++ b/drivers/storage/hakios.ufs.c
+@@ -73,6 +73,7 @@ extern void FlushPoC_DcacheRegion(vm_offset_t va, size_t length);   /* osfmk/arm
+ #define BLOCK_MAX_PARTS    160
+ #define BLOCK_MAX_UNITS    16
+ #define BLOCK_PART_UNIT    1u                          /* a whole logical unit, not a partition */
++#define BLOCK_PART_SYNTH   2u                          /* the loader has no Block I/O (bitra): this entry is its own table, not UEFI's; only this kernel's driver can read it */
+ #define BLOCK_OP_READ      0u
+ #define BLOCK_OP_WRITE     1u
+ #define BLOCK_OP_WRITE_FAST 2u                         /* written only: the data volume's (the loader, BLOCK_OP_WRITE_FAST) */
+@@ -1337,7 +1338,9 @@ ufs_native_map(bool all_units)
+ 		if (!all_units && (darwin == BLOCK_MAX_PARTS || ufs_page->part[darwin].unit != e->unit)) {
+ 			continue;
+ 		}
+-		if (e->block_size != 4096 || ufs_read_mailbox(i, 4096, theirs + n * 4096, 4096) != 0 ||
++		if ((e->flags & BLOCK_PART_SYNTH) != 0 && e->block_size == 4096) {
++			/* no loader read to compare with: the header is read natively below and must say EFI PART */
++		} else if (e->block_size != 4096 || ufs_read_mailbox(i, 4096, theirs + n * 4096, 4096) != 0 ||
+ 		    memcmp(theirs + n * 4096, "EFI PART", 8) != 0) {
+ 			printf("ufs: native: %s: no GPT header to know it by (block size %u)\n", e->name, e->block_size);
+ 			good = false;
+@@ -1358,6 +1361,17 @@ ufs_native_map(bool all_units)
+ 	for (uint32_t k = 0; good && k < n; k++) {
+ 		volatile struct loader_block_part *e = &ufs_page->part[units[k]];
+ 
++		if ((e->flags & BLOCK_PART_SYNTH) != 0) {
++			if (ufshc_read((uint8_t)e->unit, 4096, mine, 4096) != 0 || memcmp(mine, "EFI PART", 8) != 0) {
++				printf("ufs: native: %s: LUN %u's block 1 is not a GPT header (loader's table, no UEFI read to compare)\n",
++				    e->name, e->unit);
++				good = false;
++			} else {
++				printf("ufs: native: %s is LUN %u: its GPT header read natively (loader has no Block I/O)\n", e->name,
++				    e->unit);
++			}
++			continue;
++		}
+ 		if (ufshc_read((uint8_t)e->unit, 4096, mine, 4096) != 0 || memcmp(mine, theirs + k * 4096, 4096) != 0) {
+ 			printf("ufs: native: %s: LUN %u's block 1 is NOT what the loader reads as its block 1\n", e->name, e->unit);
+ 			good = false;
