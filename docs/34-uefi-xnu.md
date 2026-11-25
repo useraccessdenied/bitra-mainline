@@ -201,3 +201,7 @@ TEST UNIT READY. The kernel's own driver will have to do the same (map 0x1500000
   cannot be used for commands, and the loader-side TUR test was dropped). Image U: a stage 1 context bank (free CB, `CBAR` type 1, 64-bit, TCR 39-bit 4 KB WB,
   MAIR0 0xff) with one identity table of 16 x 1 GB blocks (`0x741`), `SCTLR.M`, and the two groups translate (S2CR type 0, that bank); the kernel's
   own driver then does its proof and reads (`ufs_native=1 smmu_bypass=1`).
+- Linux's view (Alpine, `/dev/mem` mmap of 0x15000000, read-only): UFS streams 0x4e0 (group 2) and 0xe0 (group 3) -> S2CR type 0, context bank 6;
+  bank 6 `CBAR 0001f300` (stage 1, stage 2 bypass, MemAttr f, BPSHCFG 3). **Reading the registers of an enabled context bank hangs the bus** (reading bank 6's SCTLR
+  from Linux did; so did my own read-back after `SCTLR <- 1` of bank 69 in image X, which is why the loader ring stopped there, not at the write). Context banks
+  64-69 read fine while unused (CBAR 0, SCTLR e0); the SCTLR read of bank 63 hangs (it is enabled). Next (image Y): same, without reading banks back after enabling, CBAR 0001f300.
