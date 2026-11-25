@@ -11,7 +11,7 @@
 
 static unsigned long long pa = 0xf0000000ULL;
 module_param(pa, ullong, 0444);
-static unsigned long size = 0x100000;
+static unsigned long size = 0x800000;
 module_param(size, ulong, 0444);
 static void *map;
 static struct proc_dir_entry *ent;

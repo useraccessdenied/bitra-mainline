@@ -1234,21 +1234,21 @@ gc_update_color(int color, boolean_t fore)
  * in pm_early. Layout: 8 bytes "XNUPMLOG", u32 bytes written, u32 size, text from offset 64.
  */
 #define PM_PA   0xf0000000ULL
-#define PM_SIZE (1u << 20)
+#define PM_SIZE (8u << 20)
 #define PM_HDR  64u
 static char pm_early[256 * 1024];
 static volatile uint32_t pm_early_n;
 static volatile uint8_t *pm_ring;
-static uint32_t pm_n;
+static uint32_t pm_n;                   /* bytes written in all; the text of the last PM_SIZE - PM_HDR of them is in the ring */
+static volatile bool pm_screen_quiet;   /* vcquiet=1: the ring gets every character, the screen none (from hakios_pm_map on) */
 
 static void
 pm_put(char c)
 {
 	if (pm_ring != NULL) {
-		if (pm_n < PM_SIZE - PM_HDR) {
-			pm_ring[PM_HDR + pm_n++] = (uint8_t)c;
-			*(volatile uint32_t *)(pm_ring + 8) = pm_n;
-		}
+		pm_ring[PM_HDR + (pm_n % (PM_SIZE - PM_HDR))] = (uint8_t)c;
+		pm_n++;
+		*(volatile uint32_t *)(pm_ring + 8) = pm_n;
 	} else if (pm_early_n < sizeof(pm_early)) {
 		pm_early[pm_early_n++] = c;
 	}
@@ -1259,6 +1259,7 @@ void
 hakios_pm_map(void)
 {
 	vm_offset_t va;
+	uint32_t quiet = 0;
 
 	if (pm_ring != NULL) {
 		return;
@@ -1271,11 +1272,13 @@ hakios_pm_map(void)
 	memcpy((void *)va, "XNUPMLOG", 8);
 	*(volatile uint32_t *)(va + 12) = PM_SIZE;
 	pm_n = 0;
-	for (uint32_t i = 0; i < pm_early_n; i++) {
-		((volatile uint8_t *)va)[PM_HDR + pm_n++] = (uint8_t)pm_early[i];
-	}
-	*(volatile uint32_t *)(va + 8) = pm_n;
 	pm_ring = (volatile uint8_t *)va;
+	for (uint32_t i = 0; i < pm_early_n; i++) {
+		pm_put(pm_early[i]);
+	}
+	if (PE_parse_boot_argn("vcquiet", &quiet, sizeof(quiet)) && quiet != 0) {
+		pm_screen_quiet = true;
+	}
 	VCPUTC_LOCK_UNLOCK();
 }
 
@@ -1285,6 +1288,10 @@ vcputc_options(char c, __unused bool poll)
 	if (gc_initialized && gc_enabled) {
 		VCPUTC_LOCK_LOCK();
 		pm_put(c);
+		if (pm_screen_quiet) {
+			VCPUTC_LOCK_UNLOCK();
+			return;
+		}
 		if (gc_enabled) {
 			gc_hide_cursor(gc_x, gc_y);
 			gc_putchar(c);

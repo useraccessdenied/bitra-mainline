@@ -18,7 +18,7 @@ index 2d35c83..cf9f9b7 100644
  typedef struct {
  	uint32_t type; uint32_t pad; uint64_t phys_start; uint64_t virt_start; uint64_t pages; uint64_t attribute;
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..3871978 100644
+index 735b9d0..da8623c 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
 @@ -198,6 +198,8 @@ put_char(char c)
@@ -294,14 +294,14 @@ index 735b9d0..3871978 100644
  }
  
 +/*
-+ * bitra: this loader's own log in RAM (a second post-mortem ring, 0xf0100000, "XNULDLOG", u32 bytes at +8, text from +64), so that
++ * bitra: this loader's own log in RAM (a second post-mortem ring, 0xf0800000, "XNULDLOG", u32 bytes at +8, text from +64), so that
 + * a hard reset during a hardware experiment does not lose what was printed. Written out (and cleaned from the caches) by
 + * lring_sync() before each risky step. Read from Linux with tools/xnulog (pa=0xf0100000).
 + */
 +static void
 +lring_init(void)
 +{
-+	uint64_t a = 0xf0100000ULL;
++	uint64_t a = 0xf0800000ULL;                 /* after the kernel's 8 MiB ring (f0000000) */
 +
 +	if (!EFI_ERROR(BS->allocate_pages(AllocateAddress, EfiLoaderData, 256, &a))) {
 +		lring = (uint8_t *)(uintptr_t)a;
@@ -1056,7 +1056,7 @@ index 735b9d0..3871978 100644
 +		{
 +			/* the kernel's post-mortem log ring (osfmk/console/video_console.c, PM_PA): taken from UEFI so nothing else uses it */
 +			uint64_t pm = 0xf0000000ULL;
-+			efi_status ps = BS->allocate_pages(AllocateAddress, EfiLoaderData, 256, &pm);
++			efi_status ps = BS->allocate_pages(AllocateAddress, EfiLoaderData, 2048, &pm);       /* 8 MiB */
 +
 +			print("postmortem log ring at f0000000: %s\n", EFI_ERROR(ps) ? "NOT reserved (in use)" : "reserved");
 +			if (!EFI_ERROR(ps)) {

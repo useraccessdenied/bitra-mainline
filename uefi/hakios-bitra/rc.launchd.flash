@@ -1,0 +1,3 @@
+# The flash recipe (root_apfs=...): the root is Apple's own volume after the pivot, so process 1 becomes ITS launchd.
+# (The RAM-root recipe's name /sbin/launchd.darwin exists only in system.apfs; a prebuilt init without the mapping cannot find it.)
+exec /sbin/launchd

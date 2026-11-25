@@ -241,3 +241,15 @@ the controller's first DMA faulted; plain S2CR bypass is refused, enabling a tra
 bypass groups with S2CR type 0 -> that bank); (5) the unit answered `2/04/02` until the **UFS device was woken** (START STOP UNIT to well-known unit 0xD0, ACTIVE; one new opcode in the driver's
 whitelist, narrow, self-tested); (6) UEFI's list memory is stale (freed and reused), so its content is only said; (7) read data never arrived in kernel memory above 4 GB (cached): buffers are in the loader's UEFI pages (below 4 GB, uncached).
 Open: why (7) (address above 4 GB or the cache attributes) is not known; throughput not measured (uncached 256 KB slots); `bootcpu=7` still resets; `launchd.darwin`; the SMMU bank and groups are set by the loader (`smmu_bypass=1`), not the kernel.
+
+## Apple's launchd runs (2026-11-26, image AH)
+`launchd.darwin` is not a file on the iOS volume: it is the name of the launchd that only the RAM-root recipe's `system.apfs` has. On the flash recipe the root is Apple's own volume
+and its launchd is `/sbin/launchd` (525,088 bytes, decmpfs). The prebuilt `init` I used (`PREBUILT=1`, no ld64 for the Darwin tools) predates the source's mapping of the name for `flash_root_mode`,
+so the image needs an rc that execs `/sbin/launchd` itself: `uefi/hakios-bitra/rc.launchd.flash` (`RC=rc.launchd.flash PREBUILT=1 FLASHBOOT=1 CRYPTEXES=flash ./build.sh` in `userland/`).
+Image AH: the root pivots onto the iOS volume, `exec /sbin/launchd`: `Darwin Bootstrapper Version 7.0.0 ... launchd/RELEASE_ARM64`, its boot tasks, and ~21 services spawned from our `/redwood` LaunchDaemons:
+backboardd, SpringBoard, containermanagerd, cfprefsd, notifyd, logd(+helper), lsd, powerd, runningboardd, usermanagerd, wifid, distnoted, fseventsd, datamigrator, iconservicesagent, MobileGestaltHelper, ACCHWComponentAuthService, var_store...
+backboardd creates 1125x2436 BGRA surfaces and swaps them to the (mini) framebuffer (several IOMobileFramebuffer selectors not implemented). Noise: `lsd` "denied attempt to escape CPU monitor (missing required
+entitlement)" 583 times and `minisandbox: privilege 1015 refused to lsd` (the AMFI/Sandbox stand-ins), `map_with_linking_np: region 0, not code signed` for our test binaries. The 90 s `loader_return_after`
+brought the kernel back at ~140 s of kernel time (log 246 KB in the loader), the phone went to Alpine by itself.
+Faster logs: the screen is the slow part (each console line is drawn and the framebuffer scrolled; launchd's volume throttles the whole boot). Image AI: `vcquiet=1` feeds the RAM ring but skips drawing, the kernel ring is 8 MiB and
+WRAPS (keeps the newest 8 MiB; `tools/xnulog/readring.py` unrolls a dump), the loader ring moved to 0xf0800000 (`insmod xnulog.ko pa=0xf0800000 size=0x100000`; the kernel ring is `pa=0xf0000000 size=0x800000`, the module defaults).
