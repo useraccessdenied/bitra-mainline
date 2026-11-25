@@ -1,0 +1,1 @@
+savedcmd_xnulog.ko := ld.lld -r -EL  -maarch64elf -z norelro -z noexecstack --build-id=sha1  -T /var/home/kapil/projects/bitra/roms/mainline/out/scripts/module.lds -o xnulog.ko xnulog.o xnulog.mod.o .module-common.o

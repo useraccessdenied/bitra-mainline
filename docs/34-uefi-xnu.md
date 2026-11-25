@@ -178,3 +178,12 @@ Also unknown: whether the controller's DMA (SMMU config) lets it reach the loade
   800080 01000000`, sane). Image O (Mu with the stock `EnableUfsIOC = 0`): Mu does not boot at all (ABL goes to recovery); the patch's `EnableUfsIOC = 1` is
   needed on this phone. Remaining suspect: which memory the controller's DMA may reach (SMMU). Next: send the TEST UNIT READY through UEFI's own list
   and descriptor memory (no switch) to see whether DMA to UEFI's own pages works.
+- Image P (`ufs_native=4`, TEST UNIT READY through UEFI's own list and its own UCD, kernel, no switch): resets at the doorbell too
+  (`uefi-tur 1 ... ringing UEFI's slot 0 ... now` is the last line). Image Q (the same test from the loader at UEFI time, loader ring at
+  0xf0100000 read with `insmod xnulog.ko pa=0xf0100000`): also resets (last line `uefi-tur: ringing UEFI's slot 0 now (HCS 10f IS 400 doorbell 0 run 1)`).
+  So a doorbell from anything but UEFI's driver resets the phone (`androidboot.startupmode=hard_reset` in Alpine's cmdline afterwards),
+  from the loader too, with UEFI's own memory and format. Not the kernel's mappings, not our memory, not our command.
+- Linux has the UFS controller (SIDs 0xe0, 0x4e0) in a translated IOMMU domain (apps SMMU 15000000, SMMUv2, 87 stream groups, 74 context banks;
+  `iommu_groups/8: DMA 1d84000.ufshc`). Theory: UEFI's driver maps its buffers in the SMMU around each command; an unmapped DMA is an SMMU fault
+  that the secure side turns into a hard reset. Image R: the loader dumps the SMMU stream matching entries (`smmu_dump=1`) and sets the entries
+  matching the UFS stream IDs to bypass (`smmu_bypass=1`) before the TEST UNIT READY.

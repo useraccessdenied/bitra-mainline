@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * xnulog: read back the log the HakiOS (XNU) kernel leaves in RAM before a reset.
- * insmod xnulog.ko [pa=0xf0000000] [size=0x100000]; then `cat /proc/xnulog > log.bin`.
+ * insmod xnulog.ko [pa=0xf0000000] [size=0x100000]; `cat /proc/xnulog > log.bin` reads, `echo > /proc/xnulog` clears.
  * Maps the range with memremap(); read only. Debug tool for bitra-mainline docs/34.
  */
 #include <linux/module.h>
@@ -28,14 +28,21 @@ static ssize_t xl_read(struct file *f, char __user *buf, size_t n, loff_t *pos)
 	return n;
 }
 
-static const struct proc_ops xl_ops = { .proc_read = xl_read, .proc_lseek = default_llseek };
+/* any write clears the whole ring: done before each HakiOS run, so that what is read after it can only be that run's */
+static ssize_t xl_write(struct file *f, const char __user *buf, size_t n, loff_t *pos)
+{
+	memset(map, 0, size);
+	return n;
+}
+
+static const struct proc_ops xl_ops = { .proc_read = xl_read, .proc_write = xl_write, .proc_lseek = default_llseek };
 
 static int __init xl_init(void)
 {
 	map = memremap(pa, size, MEMREMAP_WB);
 	if (!map)
 		return -ENOMEM;
-	ent = proc_create("xnulog", 0400, NULL, &xl_ops);
+	ent = proc_create("xnulog", 0600, NULL, &xl_ops);
 	if (!ent) {
 		memunmap(map);
 		return -ENOMEM;
