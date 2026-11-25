@@ -205,3 +205,15 @@ TEST UNIT READY. The kernel's own driver will have to do the same (map 0x1500000
   bank 6 `CBAR 0001f300` (stage 1, stage 2 bypass, MemAttr f, BPSHCFG 3). **Reading the registers of an enabled context bank hangs the bus** (reading bank 6's SCTLR
   from Linux did; so did my own read-back after `SCTLR <- 1` of bank 69 in image X, which is why the loader ring stopped there, not at the write). Context banks
   64-69 read fine while unused (CBAR 0, SCTLR e0); the SCTLR read of bank 63 hangs (it is enabled). Next (image Y): same, without reading banks back after enabling, CBAR 0001f300.
+
+## The kernel's own UFS driver reaches the storage (2026-11-25, image Z)
+Images X/Y: enabling a translated context bank (writing `SCTLR` with `M`) hangs the bus on this SMMU, and so does reading any enabled bank, so no page table.
+Image Z does what Linux's Qualcomm SMMU code does for streams that should bypass (the hypervisor refuses S2CR bypass; Linux reserves the **last
+context bank (73) as a bypass bank**: `CBAR` type 1 `0x10000`, `SCTLR.M` left 0, and bypass groups get S2CR type 0 with that bank): the loader writes
+`CBAR(73) = 0x10000`, makes free groups 4 and 5 for the stream IDs 0xe0 and 0x4e0 with S2CR 73, and invalidates (`smmu_bypass=1`).
+Result: no reset. The kernel's own transfer list is fetched, the proof TEST UNIT READY of LUN 0 runs (`OCS 0, response 21`) and the drive answers
+`status 02, sense 2/04/02` (not ready, initializing command required: the unit has to be started, as Linux's sd driver does). The driver took that for
+a failed proof and fell back to the loader (the loader has no Block I/O here), so the darwin mount failed with EIO.
+Next (image AA): the driver treats a CHECK CONDITION to TEST UNIT READY as an answer, and on 2/04/02 sends one **START STOP UNIT, plain start** to the unit and asks again.
+That is one new opcode in the driver's whitelist (`hc_refusal`): `0x1b` only with CDB4 = 0x01 (start, no LOEJ, power condition 0), not immediate, no data, only to
+a unit reads may go to; stop, LOEJ, every power condition and the well-known units stay refused (self-test cases added). It writes no data.
