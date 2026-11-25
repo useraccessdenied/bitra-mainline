@@ -187,3 +187,11 @@ Also unknown: whether the controller's DMA (SMMU config) lets it reach the loade
   `iommu_groups/8: DMA 1d84000.ufshc`). Theory: UEFI's driver maps its buffers in the SMMU around each command; an unmapped DMA is an SMMU fault
   that the secure side turns into a hard reset. Image R: the loader dumps the SMMU stream matching entries (`smmu_dump=1`) and sets the entries
   matching the UFS stream IDs to bypass (`smmu_bypass=1`) before the TEST UNIT READY.
+
+## The UFS reset is the SMMU (2026-11-25, image S) 
+Loader ring of S (apps SMMU 0x15000000, read at UEFI time; reading is safe): `sCR0 2d0406` (USFCFG=1: a transaction of a stream that no
+group matches is a fault), `IDR0 4c017e57` (87 stream groups), only 5 valid SMR: ids 0x4a0, 0xc0, 0x0, 0x20 and 0x820 (mask 0x402); none matches the UFS stream IDs 0xe0 / 0x4e0
+(DT `iommus`). UEFI's UFSDxe maps the controller only around its own commands; a doorbell from anyone else is a DMA of an unmatched stream: SMMU
+fault, hard reset (`androidboot.startupmode=hard_reset`). This explains J..R (kernel and loader alike, UEFI's memory or ours).
+Fix under test (image T): make a free stream group for each of 0xe0 and 0x4e0, S2CR type bypass first, SMR valid last, then retry the
+TEST UNIT READY. The kernel's own driver will have to do the same (map 0x15000000, same two groups) before it takes the controller.
