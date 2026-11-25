@@ -217,3 +217,8 @@ a failed proof and fell back to the loader (the loader has no Block I/O here), s
 Next (image AA): the driver treats a CHECK CONDITION to TEST UNIT READY as an answer, and on 2/04/02 sends one **START STOP UNIT, plain start** to the unit and asks again.
 That is one new opcode in the driver's whitelist (`hc_refusal`): `0x1b` only with CDB4 = 0x01 (start, no LOEJ, power condition 0), not immediate, no data, only to
 a unit reads may go to; stop, LOEJ, every power condition and the well-known units stay refused (self-test cases added). It writes no data.
+- Image AA/AB: a TEST UNIT READY, and a READ of LUN 0, answer `2/04/02` (not ready, initializing command required); a plain START STOP UNIT to LUN 0 is refused by the drive
+  (`5/24/00`). So the unit takes no I/O: the device is likely in a low power mode. The proof now counts a controller-run command with a valid response as proven.
+  Image AC: the driver's one non-read command changes to what Linux's ufshcd sends to wake a UFS device: START STOP UNIT of the **device well-known unit
+  (0xD0), power condition ACTIVE (CDB4 = 0x10)**, not immediate, no data. Every other START STOP UNIT (a normal unit, other power conditions, start/stop/eject
+  bits) and every other use of a well-known unit stays refused (self-test cases). It writes no data.
