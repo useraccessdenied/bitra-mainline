@@ -1,5 +1,5 @@
 diff --git a/xnuloader/efi.h b/xnuloader/efi.h
-index 2d35c83..cf9f9b7 100644
+index 2d35c83..d7e95eb 100644
 --- a/xnuloader/efi.h
 +++ b/xnuloader/efi.h
 @@ -30,11 +30,13 @@ struct efi_text_output;
@@ -17,8 +17,17 @@ index 2d35c83..cf9f9b7 100644
  
  typedef struct {
  	uint32_t type; uint32_t pad; uint64_t phys_start; uint64_t virt_start; uint64_t pages; uint64_t attribute;
+@@ -61,7 +63,7 @@ typedef struct {
+ 	efi_status (EFIAPI *stall)(uint64_t microseconds);
+ 	efi_status (EFIAPI *set_watchdog_timer)(uint64_t timeout, uint64_t code, uint64_t size, char16 *data);
+ 	void *connect_controller, *disconnect_controller, *open_protocol, *close_protocol, *open_protocol_information;
+-	void *protocols_per_handle;
++	efi_status (EFIAPI *protocols_per_handle)(efi_handle h, efi_guid ***buf, uint64_t *count);
+ 	efi_status (EFIAPI *locate_handle_buffer)(int type, const efi_guid *guid, void *key, uint64_t *count, efi_handle **buf);
+ 	efi_status (EFIAPI *locate_protocol)(const efi_guid *guid, void *registration, void **iface);
+ 	void *install_multiple_protocol_interfaces, *uninstall_multiple_protocol_interfaces;
 diff --git a/xnuloader/loader.c b/xnuloader/loader.c
-index 735b9d0..650d3b8 100644
+index 735b9d0..7a9d01e 100644
 --- a/xnuloader/loader.c
 +++ b/xnuloader/loader.c
 @@ -171,6 +171,7 @@ str_eq(const char *a, const char *b)
@@ -139,7 +148,8 @@ index 735b9d0..650d3b8 100644
 +				screen_quiet = q;
 +				lring_sync();
 +				print("kernel log: %d bytes, in the loader ring at f0800000\n", klog_len);
-+			}
+ 			}
+-			print("\n== END OF LOG ==\n");
 +			BS->stall(2000000ULL);
 +			return;
 +		}
@@ -159,8 +169,7 @@ index 735b9d0..650d3b8 100644
 +
 +			for (uint64_t i = 0; i < n; i++) {
 +				loader_copy[i] = log_buf[i];
- 			}
--			print("\n== END OF LOG ==\n");
++			}
 +			show_log_page(loader_copy, n, 0, 1, 2, "LOADER");
 +			show_log_page(loader_copy, n, PAGE_LINES, 2, 2, "LOADER");
 +		}
@@ -315,7 +324,7 @@ index 735b9d0..650d3b8 100644
  	lo = hc_rd(HC_UTRLBA);
  	hi = hc_rd(HC_UTRLBAU);
  	print("ufs: controller at %x: CAP %x, VER %x, HCE %x, HCS %x, IS %x, IE %x, list %x:%x, run %x, doorbell %x\n",
-@@ -1923,6 +2126,317 @@ block_is_darwin(const efi_partition_info *info, const efi_block_io *bio, const s
+@@ -1923,6 +2126,723 @@ block_is_darwin(const efi_partition_info *info, const efi_block_io *bio, const s
  	return 1;
  }
  
@@ -544,6 +553,52 @@ index 735b9d0..650d3b8 100644
 + * steps said first to the ring (tlmm_test=PIN on the command line).
 + */
 +static int tlmm_test_pin = -1;
++static int touch_pins_requested;
++
++/*
++ * Image AT: how is 0x0f100000 mapped (UEFI's tables, TTBR0_EL1)? A write through a Normal-cacheable mapping of a device region can end in an external
++ * abort that resets the phone while reads work. Prints TTBR0/TCR/MAIR/SCTLR and every level of the walk for the TLMM and, as a comparison, for the
++ * framebuffer. Reads of page-table memory only.
++ */
++static void
++mmu_walk(uint64_t va)
++{
++	uint64_t ttbr, tcr, mair, sctlr, tg, t0sz, lvl_start, tbl;
++	unsigned granule_shift;
++
++	__asm__ volatile ("mrs %0, ttbr0_el1" : "=r"(ttbr));
++	__asm__ volatile ("mrs %0, tcr_el1" : "=r"(tcr));
++	__asm__ volatile ("mrs %0, mair_el1" : "=r"(mair));
++	__asm__ volatile ("mrs %0, sctlr_el1" : "=r"(sctlr));
++	print("mmu: va %x: TTBR0 %x TCR %x MAIR %x SCTLR %x\n", va, ttbr, tcr, mair, sctlr);
++	tg = (tcr >> 14) & 3;
++	t0sz = tcr & 63;
++	granule_shift = tg == 0 ? 12 : tg == 2 ? 14 : 16;
++	if (granule_shift != 12) {
++		print("mmu: granule %d, walk not done\n", (uint64_t)granule_shift);
++		return;
++	}
++	/* 4 KB granule: 48 bit VA starts at level 0, 39 bit at level 1 */
++	lvl_start = (64 - t0sz) > 39 ? 0 : 1;
++	tbl = ttbr & 0x0000fffffffff000ULL;
++	for (uint64_t lvl = lvl_start; lvl < 4; lvl++) {
++		unsigned shift = 12 + 9 * (3 - (unsigned)lvl);
++		uint64_t idx = (va >> shift) & 511, d = ((volatile uint64_t *)(uintptr_t)tbl)[idx];
++
++		print("mmu:   L%d [%d] = %x\n", lvl, idx, d);
++		if ((d & 3) == 0) {
++			print("mmu:   not mapped\n");
++			return;
++		}
++		if (lvl == 3 || (d & 3) == 1) {
++			uint64_t ai = (d >> 2) & 7;
++
++			print("mmu:   leaf: AttrIndx %d = MAIR byte %x, SH %d, AP %d, XN %d\n", ai, (mair >> (8 * ai)) & 0xff, (d >> 8) & 3, (d >> 6) & 3, (d >> 53) & 1);
++			return;
++		}
++		tbl = d & 0x0000fffffffff000ULL;
++	}
++}
 +
 +/*
 + * Image AP: a no-op write to gpio36 at UEFI time reset the phone. Now (tlmm_test=1): the configuration of all 180 pins read (reads only) and the
@@ -555,6 +610,8 @@ index 735b9d0..650d3b8 100644
 +	static const int pins[] = { 0, 50, 100, 150, 36 };
 +	uint32_t shown = 0;
 +
++	mmu_walk(0x0f100000ULL);
++	mmu_walk(0x9c000000ULL);
 +	print("tlmm: scanning the CFG registers of gpio0..179 (reads only)\n");
 +	for (int pin = 0; pin < 180; pin++) {
 +		uint32_t c = *(volatile uint32_t *)(uintptr_t)(0x0f100000ULL + 0x1000ULL * (uint64_t)pin);
@@ -630,10 +687,368 @@ index 735b9d0..650d3b8 100644
 +	psci_call(0x84000009ULL, 0, 0, 0);
 +}
 +
++/*
++ * Image AU: the mapping is Device-nGnRnE, so the resets are not an attribute problem (image AT). tlmm_test=3: (1) Qualcomm's secure monitor register
++ * calls (SCM svc 5 IO_READ cmd 1 / IO_WRITE cmd 2, fast SMC64: 0xC2000501 / 0xC2000502, arginfo = number of value arguments) on gpio36's CFG: the read first
++ * (it must give the same value as the direct read), then the write of the same value; (2) direct no-op writes on other pins first (50, 100, 150),
++ * gpio0 and gpio36 last, each said before it is done.
++ */
++static void
++scm_smc(uint64_t fn, uint64_t argn, uint64_t a0, uint64_t a1, uint64_t *r)
++{
++	register uint64_t x0 __asm__("x0") = fn;
++	register uint64_t x1 __asm__("x1") = argn;
++	register uint64_t x2 __asm__("x2") = a0;
++	register uint64_t x3 __asm__("x3") = a1;
++	register uint64_t x4 __asm__("x4") = 0;
++	register uint64_t x5 __asm__("x5") = 0;
++	register uint64_t x6 __asm__("x6") = 0;
++
++	__asm__ volatile ("smc #0" : "+r" (x0), "+r" (x1), "+r" (x2), "+r" (x3), "+r" (x4), "+r" (x5), "+r" (x6)
++                : : "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "memory");
++	r[0] = x0; r[1] = x1; r[2] = x2; r[3] = x3;
++}
++
++static void
++tlmm_scm_test(void)
++{
++	static const int pins[] = { 50, 100, 150, 0, 36 };
++	uint64_t r[4], a = 0x0f100000ULL + 0x1000ULL * 36;
++	uint32_t direct = *(volatile uint32_t *)(uintptr_t)a;
++
++	print("scm: direct read of gpio36 CFG %x\n", (uint64_t)direct);
++	scm_smc(0xC2000501ULL, 1, a, 0, r);
++	print("scm: IO_READ: x0 %x x1 %x x2 %x x3 %x\n", r[0], r[1], r[2], r[3]);
++	print("scm: IO_WRITE of the same value now\n");
++	scm_smc(0xC2000502ULL, 2, a, direct, r);
++	print("scm: IO_WRITE: x0 %x x1 %x\n", r[0], r[1]);
++	scm_smc(0xC2000501ULL, 1, a, 0, r);
++	print("scm: IO_READ after: x0 %x x1 %x\n", r[0], r[1]);
++	for (unsigned i = 0; i < sizeof(pins) / sizeof(pins[0]); i++) {
++		uint64_t base = 0x0f100000ULL + 0x1000ULL * (uint64_t)pins[i];
++		volatile uint32_t *cfg = (volatile uint32_t *)(uintptr_t)base;
++		uint32_t c = *cfg;
++
++		print("tlmm: gpio%d: CFG %x; writing it back now\n", (uint64_t)pins[i], (uint64_t)c);
++		*cfg = c;
++		__asm__ volatile ("dsb sy" ::: "memory");
++		print("tlmm: gpio%d: CFG written\n", (uint64_t)pins[i]);
++	}
++	print("tlmm: all writes passed\n");
++}
++
++/*
++ * Image AV (tlmm_test=4): Mu's own drivers (TLMMDxe, I2CDxe, PmicDxe...) do have write access to the pin controller; every protocol of every handle is
++ * listed (GUID, and the interface pointer) so they can be matched with the driver binaries and used from here, before the kernel starts.
++ */
++static void
++protocol_dump(void)
++{
++	efi_handle *handles;
++	uint64_t count;
++
++	if (EFI_ERROR(BS->locate_handle_buffer(AllHandles, NULL, NULL, &count, &handles))) {
++		print("proto: no handles\n");
++		return;
++	}
++	print("proto: %d handles\n", count);
++	for (uint64_t i = 0; i < count; i++) {
++		efi_guid **g;
++		uint64_t n = 0;
++
++		if (EFI_ERROR(BS->protocols_per_handle(handles[i], &g, &n))) {
++			continue;
++		}
++		for (uint64_t j = 0; j < n; j++) {
++			void *iface = NULL;
++
++			BS->handle_protocol(handles[i], g[j], &iface);
++			const uint32_t *w = (const uint32_t *)g[j];
++
++			print("proto: h%d w %x %x %x %x if %x\n", i, (uint64_t)w[0], (uint64_t)w[1], (uint64_t)w[2], (uint64_t)w[3],
++			    (uint64_t)(uintptr_t)iface);
++		}
++	}
++	print("proto: done\n");
++}
++
++/*
++ * Image AW (tlmm_test=5): Mu's own protocols instead of raw register writes (found in image AV; layouts from Qualcomm's QcomPkg/Include/Protocol, as
++ * edk2-msm's touch drivers use them). Everything said before it is done; nothing is powered except gpio38 (the touch reset line) set as an output.
++ *  1. TLMM protocol: GpioIn of gpio38/39; ConfigGpio + GpioOut(1) on gpio38; the raw CFG of gpio38 read before and after (reads only).
++ *  2. PMIC VREG protocol: VregGetLevel (read) of LDO 1..16 on PMIC devices 0..3 (enum assumed: LDO_1 = 0).
++ *  3. I2C protocol: open instance N, one byte read of address 0x4b, close, for N = 13, then 1..18 (a chip that is not powered does not answer).
++ */
++typedef struct {
++	uint64_t revision;
++	efi_status (EFIAPI *config_gpio)(uint32_t config, uint32_t enable);
++	efi_status (EFIAPI *config_gpio_group)(uint32_t enable, uint32_t *group, uint32_t size);
++	efi_status (EFIAPI *gpio_in)(uint32_t config, uint32_t *value);
++	efi_status (EFIAPI *gpio_out)(uint32_t config, uint32_t value);
++	efi_status (EFIAPI *set_inactive)(uint32_t gpio, uint32_t config);
++} qc_tlmm;
++
++typedef struct {
++	uint64_t revision;
++	efi_status (EFIAPI *vreg_control)(uint32_t dev, uint32_t id, uint8_t enable);
++	efi_status (EFIAPI *vreg_set_level)(uint32_t dev, uint32_t id, uint32_t mv);
++	efi_status (EFIAPI *vreg_get_level)(uint32_t dev, uint32_t id, uint32_t *mv);
++} qc_vreg;
++
++typedef struct {
++	uint32_t bus_frequency_khz, slave_address, mode, max_clock_stretch_us, core_config1, core_config2;
++} qc_i2c_slave;
++
++typedef struct {
++	uint64_t revision;
++	uint32_t (EFIAPI *open)(uint32_t instance, void **handle);
++	uint32_t (EFIAPI *read)(void *h, qc_i2c_slave *cfg, uint16_t offset, uint16_t offset_len, uint8_t *buf, uint16_t len, uint32_t *got, uint32_t timeout_ms);
++	uint32_t (EFIAPI *write)(void *h, qc_i2c_slave *cfg, uint16_t offset, uint16_t offset_len, uint8_t *buf, uint16_t len, uint32_t *done, uint32_t timeout_ms);
++	void *transfer;
++	uint32_t (EFIAPI *close)(void *h);
++} qc_i2c;
++
++static void
++protocol_touch_test(void)
++{
++	static const efi_guid tlmm_guid = { 0xad9aec18, 0x7bf0, 0x4809, { 0x9e, 0x96, 0x30, 0x12, 0x30, 0x9f, 0x3d, 0xf7 } };
++	static const efi_guid vreg_guid = { 0x22d38d3d, 0xe8b6, 0x4f8f, { 0x9c, 0x26, 0xbc, 0xeb, 0x07, 0xd6, 0xcb, 0x68 } };
++	static const efi_guid i2c_guid = { 0xb27ae8b1, 0x3e10, 0x4d07, { 0xab, 0x5c, 0xeb, 0x9a, 0x6d, 0xc6, 0xfa, 0x8f } };
++	qc_tlmm *tl = NULL;
++	qc_vreg *vr = NULL;
++	qc_i2c *ic = NULL;
++	efi_status st;
++
++	st = BS->locate_protocol(&tlmm_guid, NULL, (void **)&tl);
++	print("pt: TLMM protocol: status %x at %x\n", (uint64_t)st, (uint64_t)(uintptr_t)tl);
++	st = BS->locate_protocol(&vreg_guid, NULL, (void **)&vr);
++	print("pt: VREG protocol: status %x at %x\n", (uint64_t)st, (uint64_t)(uintptr_t)vr);
++	st = BS->locate_protocol(&i2c_guid, NULL, (void **)&ic);
++	print("pt: I2C protocol: status %x at %x\n", (uint64_t)st, (uint64_t)(uintptr_t)ic);
++	if (tl) {
++		uint32_t rst = (38u << 4) | (0u) | (1u << 14) | (0u << 15) | (0u << 17) | 0x20000000u, irq = (39u << 4) | 0x20000000u, v = 0xdead;
++
++		print("pt: TLMM revision %x; raw gpio38 CFG %x\n", tl->revision, (uint64_t)*(volatile uint32_t *)0x0f126000ULL);
++		st = tl->gpio_in(irq, &v);
++		print("pt: GpioIn(gpio39): status %x value %x\n", (uint64_t)st, (uint64_t)v);
++		print("pt: ConfigGpio(gpio38 output, enable) now\n");
++		st = tl->config_gpio(rst, 1);
++		print("pt: ConfigGpio: status %x; raw gpio38 CFG %x\n", (uint64_t)st, (uint64_t)*(volatile uint32_t *)0x0f126000ULL);
++		st = tl->gpio_out(rst, 1);
++		print("pt: GpioOut(gpio38, 1): status %x; raw gpio38 CFG %x IO %x\n", (uint64_t)st, (uint64_t)*(volatile uint32_t *)0x0f126000ULL,
++		    (uint64_t)*(volatile uint32_t *)0x0f126004ULL);
++	}
++	if (vr) {
++		print("pt: VREG revision %x; levels in mV (LDO 1..16, PMIC devices 0..3; - = error)\n", vr->revision);
++		for (uint32_t dev = 0; dev < 4; dev++) {
++			for (uint32_t ldo = 0; ldo < 16; ldo++) {
++				uint32_t mv = 0;
++
++				st = vr->vreg_get_level(dev, ldo, &mv);
++				if (EFI_ERROR(st)) {
++					print("pt: vreg dev%d ldo%d: status %x\n", (uint64_t)dev, (uint64_t)(ldo + 1), (uint64_t)st);
++				} else {
++					print("pt: vreg dev%d ldo%d: %d mV\n", (uint64_t)dev, (uint64_t)(ldo + 1), (uint64_t)mv);
++				}
++			}
++		}
++	}
++	if (ic) {
++		static const uint32_t order[] = { 13, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18 };
++
++		print("pt: I2C revision %x\n", ic->revision);
++		for (unsigned i = 0; i < sizeof(order) / sizeof(order[0]); i++) {
++			void *h = NULL;
++			qc_i2c_slave cfg = { 400, 0x4b, 0, 0, 0, 0 };
++			uint8_t b = 0;
++			uint32_t got = 0, rc;
++
++			print("pt: i2c instance %d: open now\n", (uint64_t)order[i]);
++			rc = ic->open(order[i], &h);
++			print("pt: i2c instance %d: open %x handle %x\n", (uint64_t)order[i], (uint64_t)rc, (uint64_t)(uintptr_t)h);
++			if (rc != 0 || !h) {
++				continue;
++			}
++			rc = ic->read(h, &cfg, 0, 0, &b, 1, &got, 20);
++			print("pt: i2c instance %d: read 0x4b: status %x got %d byte %x\n", (uint64_t)order[i], (uint64_t)rc, (uint64_t)got, (uint64_t)b);
++			ic->close(h);
++		}
++	}
++	print("pt: done\n");
++}
++
++/*
++ * Image AX: read-only look at the USB controller (DWC3 at 0xa600000 on SM8250) in the state Mu leaves it: is it clocked (reads answer), which mode
++ * (GCTL.PRTCAPDIR 1 host / 2 device), is the device side running (DCTL.RUN_STOP, DSTS speed/connect), PHY configuration. Each register said before it
++ * is read, so a hang (clock gated) shows in the ring as the last line. Reads only.
++ */
++static void
++dwc3_probe(void)
++{
++	static const struct { uint32_t off; const char *name; } regs[] = {
++		{ 0xc120, "GSNPSID" }, { 0xc100, "GSBUSCFG0" }, { 0xc110, "GCTL" }, { 0xc118, "GSTS" }, { 0xc140, "GHWPARAMS0" }, { 0xc144, "GHWPARAMS1" },
++		{ 0xc148, "GHWPARAMS2" }, { 0xc14c, "GHWPARAMS3" }, { 0xc150, "GHWPARAMS4" }, { 0xc154, "GHWPARAMS5" }, { 0xc158, "GHWPARAMS6" },
++		{ 0xc15c, "GHWPARAMS7" }, { 0xc200, "GUSB2PHYCFG0" }, { 0xc2c0, "GUSB3PIPECTL0" }, { 0xc700, "DCFG" }, { 0xc704, "DCTL" },
++		{ 0xc708, "DEVTEN" }, { 0xc70c, "DSTS" }, { 0xc710, "DGCMDPAR" }, { 0xc720, "DALEPENA" },
++		{ 0xc400, "GEVNTADRLO0" }, { 0xc404, "GEVNTADRHI0" }, { 0xc408, "GEVNTSIZ0" }, { 0xc40c, "GEVNTCOUNT0" },
++	};
++
++	print("usb: DWC3 at a600000, read only\n");
++	for (unsigned i = 0; i < sizeof(regs) / sizeof(regs[0]); i++) {
++		print("usb: reading %s (+%x)\n", (uint64_t)(uintptr_t)regs[i].name, (uint64_t)regs[i].off);
++		print("usb: %s = %x\n", (uint64_t)(uintptr_t)regs[i].name, (uint64_t)*(volatile uint32_t *)(0x0a600000ULL + regs[i].off));
++	}
++	print("usb: done\n");
++}
++
++/*
++ * Image AX (tlmm_test=6): after AW (Mu's protocols write; PMIC device 2 = PM8150C: LDO1 = l1c 1.8 V avdd, LDO11 = l11c vdd; I2C instance 12 = the touch
++ * bus at 0xa94000; levels read in microvolts): the DWC3 probe first (reads), then the touch chip: enable l1c and l11c at the levels they already have (no
++ * SetLevel), reset gpio38 low 20 ms / high, then poll gpio39 (interrupt, active low) for 600 ms and read 4 bytes from 0x4b on instance 12 (a TouchComm
++ * message starts 0xa5 <code> <length lo> <length hi>) at 100 ms steps; then the same read on the other buses that open.
++ */
++static void
++delay_us(uint64_t us)
++{
++	uint64_t f, t0, now;
++
++	__asm__ volatile ("mrs %0, cntfrq_el0" : "=r"(f));
++	__asm__ volatile ("mrs %0, cntvct_el0" : "=r"(t0));
++	do {
++		__asm__ volatile ("mrs %0, cntvct_el0" : "=r"(now));
++	} while ((now - t0) * 1000000ULL < us * f);
++}
++
++static void
++touch_power_test(void)
++{
++	static const efi_guid tlmm_guid = { 0xad9aec18, 0x7bf0, 0x4809, { 0x9e, 0x96, 0x30, 0x12, 0x30, 0x9f, 0x3d, 0xf7 } };
++	static const efi_guid vreg_guid = { 0x22d38d3d, 0xe8b6, 0x4f8f, { 0x9c, 0x26, 0xbc, 0xeb, 0x07, 0xd6, 0xcb, 0x68 } };
++	static const efi_guid i2c_guid = { 0xb27ae8b1, 0x3e10, 0x4d07, { 0xab, 0x5c, 0xeb, 0x9a, 0x6d, 0xc6, 0xfa, 0x8f } };
++	static const uint32_t buses[] = { 12, 2, 6, 16, 17 };
++	qc_tlmm *tl = NULL;
++	qc_vreg *vr = NULL;
++	qc_i2c *ic = NULL;
++	efi_status st;
++	uint32_t rst = (38u << 4) | (1u << 14) | 0x20000000u, irq = (39u << 4) | (3u << 15) | 0x20000000u, v;
++
++	BS->locate_protocol(&tlmm_guid, NULL, (void **)&tl);
++	BS->locate_protocol(&vreg_guid, NULL, (void **)&vr);
++	BS->locate_protocol(&i2c_guid, NULL, (void **)&ic);
++	print("tp: protocols TLMM %x VREG %x I2C %x\n", (uint64_t)(uintptr_t)tl, (uint64_t)(uintptr_t)vr, (uint64_t)(uintptr_t)ic);
++	if (!tl || !vr || !ic) {
++		return;
++	}
++	{
++		uint64_t daif;
++
++		__asm__ volatile ("mrs %0, daif" : "=r"(daif));
++		print("tp: DAIF %x (bit 7 I = IRQ masked, bit 6 F = FIQ masked)\n", daif);
++	}
++	print("tp: ConfigGpio gpio39 input pull-up\n");
++	st = tl->config_gpio(irq, 1);
++	print("tp: status %x\n", (uint64_t)st);
++	delay_us(20000);
++	print("tp: reset low\n");
++	tl->config_gpio(rst, 1);
++	tl->gpio_out(rst, 0);
++	delay_us(20000);
++	print("tp: reset high\n");
++	tl->gpio_out(rst, 1);
++	for (int ms = 0; ms < 600; ms += 100) {
++		v = 9;
++		tl->gpio_in(irq, &v);
++		print("tp: +%d ms: gpio39 %d\n", (uint64_t)ms, (uint64_t)v);
++		delay_us(100000);
++	}
++	for (unsigned b = 0; b < sizeof(buses) / sizeof(buses[0]); b++) {
++		void *h = NULL;
++		qc_i2c_slave cfg = { 400, 0x4b, 0, 0, 0, 0 };
++		uint8_t buf[4] = { 0, 0, 0, 0 };
++		uint32_t got = 0, rc;
++
++		rc = ic->open(buses[b], &h);
++		print("tp: i2c %d: open %x\n", (uint64_t)buses[b], (uint64_t)rc);
++		if (rc != 0 || !h) {
++			continue;
++		}
++		for (int k = 0; k < 3; k++) {
++			got = 0;
++			rc = ic->read(h, &cfg, 0, 0, buf, 4, &got, 50);
++			v = 9;
++			tl->gpio_in(irq, &v);
++			print("tp: i2c %d: read 4 bytes: status %x got %d: %x %x %x %x (gpio39 %d)\n", (uint64_t)buses[b], (uint64_t)rc, (uint64_t)got,
++			    (uint64_t)buf[0], (uint64_t)buf[1], (uint64_t)buf[2], (uint64_t)buf[3], (uint64_t)v);
++			if (rc == 0) {
++				break;
++			}
++			delay_us(100000);
++		}
++		ic->close(h);
++	}
++	{
++		void *h = NULL;
++		qc_i2c_slave cfg = { 400, 0, 0, 0, 0, 0 };
++		uint8_t b1;
++		uint32_t got, rc;
++
++		if (ic->open(12, &h) == 0 && h) {
++			print("tp: scanning 0x08..0x77 on bus 12\n");
++			for (uint32_t a = 8; a < 0x78; a++) {
++				cfg.slave_address = a;
++				got = 0;
++				rc = ic->read(h, &cfg, 0, 0, &b1, 1, &got, 20);
++				if (rc == 0) {
++					print("tp: scan: 0x%x answers (byte %x)\n", (uint64_t)a, (uint64_t)b1);
++				}
++			}
++			ic->close(h);
++			print("tp: scan done\n");
++		}
++	}
++	print("tp: enabling l11c (dev2 LDO11) now (this may hang)\n");
++	st = vr->vreg_control(2, 10, 1);
++	print("tp: l11c status %x\n", (uint64_t)st);
++	print("tp: done\n");
++}
++
++/*
++ * Image AZ (touch_pins=1): the pins of the touch screen set through Mu's TLMM protocol (raw writes reset the phone): gpio36 (SDA) and gpio37 (SCL) to the
++ * serial engine's function 1 ("qup13") with the pull-up and 2 mA drive, gpio38 (the chip's reset) an output driven high (not in reset), gpio39 (its
++ * interrupt line) an input with a pull-up. The pin state stays when the kernel takes over; the kernel's touch driver then powers the chip (RPMh)
++ * and talks to it through the serial engine.
++ */
++static void
++touch_pins_setup(void)
++{
++	static const efi_guid tlmm_guid = { 0xad9aec18, 0x7bf0, 0x4809, { 0x9e, 0x96, 0x30, 0x12, 0x30, 0x9f, 0x3d, 0xf7 } };
++	qc_tlmm *tl = NULL;
++	efi_status st;
++	uint32_t sda = (36u << 4) | 1u | (0u << 14) | (3u << 15) | (0u << 17) | 0x20000000u;
++	uint32_t scl = (37u << 4) | 1u | (0u << 14) | (3u << 15) | (0u << 17) | 0x20000000u;
++	uint32_t rst = (38u << 4) | (1u << 14) | 0x20000000u;
++	uint32_t irq = (39u << 4) | (3u << 15) | 0x20000000u;
++
++	st = BS->locate_protocol(&tlmm_guid, NULL, (void **)&tl);
++	print("touch pins: TLMM protocol status %x at %x\n", (uint64_t)st, (uint64_t)(uintptr_t)tl);
++	if (!tl) {
++		return;
++	}
++	st = tl->config_gpio(sda, 1);
++	print("touch pins: gpio36 (SDA) qup13: %x\n", (uint64_t)st);
++	st = tl->config_gpio(scl, 1);
++	print("touch pins: gpio37 (SCL) qup13: %x\n", (uint64_t)st);
++	st = tl->config_gpio(irq, 1);
++	print("touch pins: gpio39 (interrupt) input pull-up: %x\n", (uint64_t)st);
++	st = tl->config_gpio(rst, 1);
++	st |= tl->gpio_out(rst, 1);
++	print("touch pins: gpio38 (reset) output high: %x\n", (uint64_t)st);
++}
++
  static void
  block_start(void)
  {
-@@ -1942,6 +2456,7 @@ block_start(void)
+@@ -1942,6 +2862,7 @@ block_start(void)
  
  	memset(&block_shared, 0, sizeof(block_shared));
  	block_tables();
@@ -641,7 +1056,7 @@ index 735b9d0..650d3b8 100644
  	/* the logical units: the block devices that are not partitions of another */
  	if (!EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &blk_guid, NULL, &count, &handles))) {
  		for (uint64_t i = 0; i < count && nunits < BLOCK_MAX_UNITS; i++) {
-@@ -1964,7 +2479,34 @@ block_start(void)
+@@ -1964,7 +2885,34 @@ block_start(void)
  	}
  	if (EFI_ERROR(BS->locate_handle_buffer(ByProtocol, &part_guid, NULL, &count, &handles))) {
  		print("ufs: no partition information: the block service is off\n");
@@ -677,7 +1092,7 @@ index 735b9d0..650d3b8 100644
  	}
  	for (uint64_t i = 0; i < count && block_shared.parts + nunits < BLOCK_MAX_PARTS; i++) {
  		struct loader_block_part *bp = &block_shared.part[block_shared.parts];
-@@ -2022,12 +2564,13 @@ block_start(void)
+@@ -2022,12 +2970,13 @@ block_start(void)
  		block_bios[block_shared.parts++] = units[u].bio;
  	}
  	/* the kernel's own transfer list: this loader's area, if the controller is as UEFI keeps it */
@@ -694,7 +1109,7 @@ index 735b9d0..650d3b8 100644
  		block_shared.native.ucd_offset = HC_UCD_OFFSET;
  		block_shared.native.ucd_size = HC_UCD_SIZE;
  		block_shared.native.slots = HC_SLOTS;
-@@ -2160,7 +2703,8 @@ block_poll(void)
+@@ -2160,7 +3109,8 @@ block_poll(void)
  	op = block_shared.ask.op;
  	started = READ_SYSREG(CNTVCT_EL0);
  	bytes = 0;
@@ -704,7 +1119,7 @@ index 735b9d0..650d3b8 100644
  	    lba < block_shared.part[part].blocks && count <= block_shared.part[part].blocks - lba) {
  		efi_block_io *bio = block_bios[part];
  
-@@ -2529,6 +3073,20 @@ wdt_arm(void)
+@@ -2529,6 +3479,20 @@ wdt_arm(void)
  {
  	uint64_t ctl = 0, since = 0;
  
@@ -725,7 +1140,7 @@ index 735b9d0..650d3b8 100644
  	if (PLAT != &platform_redwood) {
  		return; /* SMC is not routed anywhere useful on QEMU virt */
  	}
-@@ -3082,6 +3640,16 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3082,6 +4046,17 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  		block_probe_requested |= starts_with(c, "ufs_probe=1") && (c == pi.cmdline || c[-1] == ' ');
  		block_write_requested |= starts_with(c, "ufs_write=1") && (c == pi.cmdline || c[-1] == ' ') &&
  		    (c[11] == 0 || c[11] == ' ');
@@ -737,16 +1152,29 @@ index 735b9d0..650d3b8 100644
 +				tlmm_test_pin = tlmm_test_pin * 10 + (*d - '0');
 +			}
 +		}
++		touch_pins_requested |= starts_with(c, "touch_pins=1") && (c == pi.cmdline || c[-1] == ' ');
 +		smmu_dump_requested |= starts_with(c, "smmu_dump=1") && (c == pi.cmdline || c[-1] == ' ');
 +		smmu_bypass_requested |= starts_with(c, "smmu_bypass=1") && (c == pi.cmdline || c[-1] == ' ');
  		hc_requested |= starts_with(c, "ufs_native=") && (c == pi.cmdline || c[-1] == ' ') && c[11] >= '1' &&
  		    c[11] <= '9';
  	}
-@@ -3097,6 +3665,21 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3097,6 +4072,33 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  	if (ufs_requested >= 2) {
  		block_start();
  	}
-+	if (PLAT == &platform_bitra && tlmm_test_pin == 2) {
++	if (PLAT == &platform_bitra && touch_pins_requested) {
++		touch_pins_setup();
++	}
++	if (PLAT == &platform_bitra && tlmm_test_pin == 5) {
++		protocol_touch_test();
++	} else if (PLAT == &platform_bitra && tlmm_test_pin == 6) {
++		dwc3_probe();
++		touch_power_test();
++	} else if (PLAT == &platform_bitra && tlmm_test_pin == 4) {
++		protocol_dump();
++	} else if (PLAT == &platform_bitra && tlmm_test_pin == 3) {
++		tlmm_scm_test();
++	} else if (PLAT == &platform_bitra && tlmm_test_pin == 2) {
 +		tlmm_ebs_test();
 +	} else if (PLAT == &platform_bitra && tlmm_test_pin >= 0) {
 +		tlmm_test();
@@ -764,7 +1192,7 @@ index 735b9d0..650d3b8 100644
  	if (checkpoint == CHECKPOINT_SELFTEST) {
  		kernel_mpidr = this_mpidr;
  	}
-@@ -3111,6 +3694,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3111,6 +4113,12 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  		}
  	}
  	for (const char *c = pi.cmdline; *c; c++) {
@@ -777,7 +1205,7 @@ index 735b9d0..650d3b8 100644
  		if (starts_with(c, "loader_return_after=")) {
  			for (c += 20; *c >= '0' && *c <= '9'; c++) {
  				kernel_budget = kernel_budget * 10 + (uint64_t)(*c - '0');
-@@ -3538,7 +4127,11 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
+@@ -3538,7 +4546,11 @@ run_kernel(int have_checkpoint, uint64_t checkpoint)
  	if (kernel_mpidr != this_mpidr) {
  		print("the kernel will run on core %x (this is core %x)\n", kernel_mpidr, this_mpidr);
  	}
@@ -789,7 +1217,7 @@ index 735b9d0..650d3b8 100644
  	flush_log();
  	screen_quiet_before_run = screen_quiet;
  	screen_quiet = 1;               /* the screen is the kernel's now; the log still takes every line */
-@@ -4295,6 +4888,364 @@ ramfb_phone_screen(void)
+@@ -4295,6 +5307,364 @@ ramfb_phone_screen(void)
   * Only the kernel and a root image that fits in the payload come this way; the big Darwin system image does not
   * (docs/uefi-boot.md says what does).
   */
@@ -1154,7 +1582,7 @@ index 735b9d0..650d3b8 100644
  static uint64_t volume_payload_bytes;           /* 0: nothing was read; else the payload's size */
  static const char *volume_payload_note;         /* why not, if it was looked for */
  
-@@ -4428,6 +5379,7 @@ print_banner(void)
+@@ -4428,6 +5798,7 @@ print_banner(void)
  efi_status EFIAPI
  efi_main(efi_handle image, efi_system_table *st)
  {
@@ -1162,7 +1590,7 @@ index 735b9d0..650d3b8 100644
  	static const efi_guid gop_guid = EFI_GOP_GUID;
  	struct payload_info pi;
  
-@@ -4437,11 +5389,16 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4437,11 +5808,16 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	BS->set_watchdog_timer(0, 0, 0, NULL);
  	/* no payload in memory (nobody put one there): the volume this loader came from may have one, as a UEFI boot loader's does */
@@ -1179,7 +1607,7 @@ index 735b9d0..650d3b8 100644
  	if (volume_payload_bytes != 0) {
  		print("payload: %d bytes from \\EFI\\hakios\\payload.bin on the volume this loader was started from\n",
  		    volume_payload_bytes);
-@@ -4462,6 +5419,8 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4462,6 +5838,8 @@ efi_main(efi_handle image, efi_system_table *st)
  		SCREEN.stride = GOP->mode->info->pixels_per_scanline * 4;
  		if (SCREEN.base == 0xE1000000ULL) {
  			PLAT = &platform_redwood;
@@ -1188,7 +1616,7 @@ index 735b9d0..650d3b8 100644
  		} else if (SCREEN.base == 0xB8000000ULL) {
  			PLAT = &platform_garnet;
  		} else {
-@@ -4473,6 +5432,21 @@ efi_main(efi_handle image, efi_system_table *st)
+@@ -4473,6 +5851,21 @@ efi_main(efi_handle image, efi_system_table *st)
  
  	install_exception_hook();
  	wdt_arm();
