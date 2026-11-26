@@ -14,7 +14,7 @@ import argparse, hashlib, lzma, os, re, shutil, subprocess, sys, tarfile, tempfi
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BITRA = Path(os.environ.get("BITRA_REPO", ROOT.parent / "bitra"))
+BITRA = Path(os.environ.get("BITRA_REPO", ROOT.parent / "android"))
 BUILD = ROOT / "build/alpine"
 MIRROR = "https://dl-cdn.alpinelinux.org/alpine"
 CLANG = BITRA / "roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin/clang"

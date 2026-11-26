@@ -11,7 +11,7 @@ import argparse, os, shutil, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SRC = Path(os.environ.get("MAINLINE_SRC", ROOT.parent / "bitra/roms/mainline/linux"))
+DEFAULT_SRC = Path(os.environ.get("MAINLINE_SRC", ROOT.parent / "android/roms/mainline/linux"))
 DEFAULT_BASE = "b56ee7a86"  # omnipha: "sm8250: enable OnePlus focus and built-in panel"
 
 
