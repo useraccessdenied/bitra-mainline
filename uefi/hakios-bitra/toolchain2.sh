@@ -2,7 +2,7 @@
 set -e
 W=/var/home/kapil/projects/bitra/hakios/work; P=$HOME/.local
 export PERL5LIB=$HOME/.local/lib/perl5extra
-export PATH=/var/home/kapil/projects/bitra/roms/lineageos/a16/prebuilts/cmake/linux-x86/bin:/var/home/kapil/projects/bitra/roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin:$P/bin:$PATH:/var/home/kapil/projects/bitra/roms/lineageos/a16/prebuilts/build-tools/linux-x86/bin
+export PATH=/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/cmake/linux-x86/bin:/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin:$P/bin:$PATH:/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/build-tools/linux-x86/bin
 cd $W
 if [ ! -x $P/bin/automake ]; then
   echo "=== automake"

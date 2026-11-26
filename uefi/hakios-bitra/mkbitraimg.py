@@ -6,7 +6,7 @@ import argparse, gzip, os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MU = os.environ.get('MU', '/var/home/kapil/projects/mu-silicium-src/mu')
-CLANG = os.environ.get('CLANG', '/var/home/kapil/projects/bitra/roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin')
+CLANG = os.environ.get('CLANG', '/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin')
 FD_BASE, FD_SIZE = 0x9FC00000, 0x300000
 PAYLOAD_BASE = int(os.environ.get('PAYLOAD_BASE', '0xF4000000'), 16)   # must equal PAYLOAD_BASE of the loader (xnuloader/build.sh)
 PAYLOAD_MAX = 0x03F00000
