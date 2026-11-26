@@ -1,0 +1,373 @@
+{
+ "note": "names, sizes and sha256 only; vendor = from the phone's modem partition, linux-firmware = from linux-firmware (uncompressed)",
+ "vendor_release": "realme RMX3370 stock firmware as read from the phone (modem backup 20261116-213951)",
+ "linux_firmware_release": "Alpine linux-firmware 20260519",
+ "files": [
+  {
+   "path": "ath11k/QCA6390/hw2.0/amss.bin",
+   "size": 3628672,
+   "sha256": "8ab2a06422e3989012df423bb6a156fde2c3feb4cd5db4c5d3588f674dc872ff",
+   "group": "linux-firmware"
+  },
+  {
+   "path": "ath11k/QCA6390/hw2.0/board-2.bin",
+   "size": 231980,
+   "sha256": "4aa9f0fe15e9e2b6f9bb13b7187ed8ce035d9d46fb65fac5d5eba2c4e7edc091",
+   "group": "linux-firmware"
+  },
+  {
+   "path": "ath11k/QCA6390/hw2.0/m3.bin",
+   "size": 266684,
+   "sha256": "1921d25edb52f90a7a0acc7275861e14399f904d579aae9f7ab1c4d28533fad6",
+   "group": "linux-firmware"
+  },
+  {
+   "path": "qca/htbtfw20.tlv",
+   "size": 210704,
+   "sha256": "3fbe07f93d170b1483c1c7f71bdfd6c98862281bfc10898b8cd537b700f688ec",
+   "group": "linux-firmware"
+  },
+  {
+   "path": "qca/htnv20.bin",
+   "size": 5857,
+   "sha256": "a4c0cbafc102998805679a2947aa82dd3b0abf1a1c0b372f1630b8ea327e2e8a",
+   "group": "linux-firmware"
+  },
+  {
+   "path": "qcom/a650_gmu.bin",
+   "size": 41548,
+   "sha256": "df79fa8482fcc7587bb239b9c9e2b24bce4729893b990fe3f82b30da8175b01c",
+   "group": "linux-firmware"
+  },
+  {
+   "path": "qcom/a650_sqe.fw",
+   "size": 31964,
+   "sha256": "c863ceac3a823af215205d7803776bfdc68098c2c2a5d2fd05b4aa77cd336b4b",
+   "group": "linux-firmware"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b00",
+   "size": 692,
+   "sha256": "33f38548f06c7e641d0a6c78998a0c06cd1e01e6b444407ddd6cbf8c64eca09d",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b01",
+   "size": 7528,
+   "sha256": "2107bed85529aa674f6faf33c442313c7d8a6cd55739d09c8b4f5ccf7b2c684b",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b02",
+   "size": 82552,
+   "sha256": "42d50d946b4ae0c7990ee21892436e801166b6a6c5f77fec29e1bb302794943d",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b03",
+   "size": 358784,
+   "sha256": "4cb6cda72cb7eb86968c443ffb173a50eebbaeaa1bfb329a47736f9078992e79",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b04",
+   "size": 1961932,
+   "sha256": "18b9bdd9b20735ff2f827f52f43284f48f05ae1d7214b7fa027249e0d5bcd624",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b05",
+   "size": 2487868,
+   "sha256": "b55bab81df9f936c82738698676b6024e5247b6e4cbadfdfe0913889febe6a4b",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b06",
+   "size": 38640,
+   "sha256": "6330322efc9e7ceb48f9c2c75db0e38f6f546f04f11a96b2da4695ad0ca8277b",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b07",
+   "size": 28972,
+   "sha256": "cb9fbd8220da1b64e22959f62518782be53251140bcd30ae469e33ad1de2951d",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b08",
+   "size": 126736,
+   "sha256": "5dbf0c0444445012d9d729465f52cffc15766201f70421ea38b62d3a975603cd",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b09",
+   "size": 65224,
+   "sha256": "3f0957684b86661263280597047c299b9206d81c4e3b7440e25c30ae1674ddd3",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b10",
+   "size": 610304,
+   "sha256": "eeead0a774ac358d78b3b3b66a62af9aba8f40e3226bc66a05f86569eb3ec69c",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b11",
+   "size": 8309644,
+   "sha256": "e2641c4be74b309582a86a280dd9b095c96b69f633362475b253af7e111e2d66",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b12",
+   "size": 296320,
+   "sha256": "dad23cb813977feb550df9d54f50be12996643781184a7c831ed4a36adfcd9ec",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b13",
+   "size": 568,
+   "sha256": "a49d6af99254f158a9401455eb97d307c797d6b33035752f9c68f0a0eee33b45",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b14",
+   "size": 156016,
+   "sha256": "aab24af1dd17cedf005babc8026d9bb2de45a8a2533e22c6ce1f002a0648e8b6",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b15",
+   "size": 748888,
+   "sha256": "d68987728549f96e727418d235bb58dfd63eb88ddbba01c2d332fc323f4b7266",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b16",
+   "size": 285840,
+   "sha256": "2d3212fb7fd748cd2e121a5f45cde3cd67cd04448c3a658cd09b66ef9e087770",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b17",
+   "size": 432768,
+   "sha256": "d0910cd1f63a096ca8e20312a3dd02c6a90fb4a102eaee9b2ad5104b06ca079d",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.b18",
+   "size": 116,
+   "sha256": "86163ac224398dd84fab643b41199def1cb76fdb022ab40e8568ddf3c584eb2e",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/adsp.mdt",
+   "size": 8220,
+   "sha256": "e36bb50a6843665bc30b3f457e94c4ade769fc230b01a1ad28cf2b9545304060",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b00",
+   "size": 468,
+   "sha256": "f2e70c6cf025aff0b72bfd6e3d31f294e892f69f1fd79ede21428263a485565f",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b01",
+   "size": 7192,
+   "sha256": "8978e5b1537f896e5012c9e3e3df0fc776301d1f702228c57c1a564bdb8f5c5f",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b02",
+   "size": 235420,
+   "sha256": "0e81bc2154373bdeddcd642f737182e8baa7709ac03c11c42c4376c6c7e818b4",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b03",
+   "size": 105980,
+   "sha256": "ffdb55e51bf39b2d45a31b460bc9a19a99078f01a1bd14cbb221cf4b92b3b986",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b04",
+   "size": 1076,
+   "sha256": "ceb11f87af22fd6f54154295b870d089c4f98a76ff1cd69cfbab193d9857a449",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b05",
+   "size": 2803308,
+   "sha256": "c587754c05f49ad78c0777cceb5b9ebdafcfd6ea47c66496b8ca1f982e94020f",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b06",
+   "size": 83426,
+   "sha256": "9425da4a4ac6fc1bdc089b8d9968e74b96071d9707b1105ba85b11c428037b3c",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b08",
+   "size": 830592,
+   "sha256": "c65c4f26d9f527a8db93403ba22f5dde941054f9bd79d214d1706bfcf3616068",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b09",
+   "size": 2800,
+   "sha256": "537f442b7a94387c481c7f1102626bb1cb325fdebb3395e7285a13fa99cd228f",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.b11",
+   "size": 59156,
+   "sha256": "12124e23ac16ae8267870589eb4d24e1a743c14b04d172ed0d81c2d9aaed8f34",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/cdsp.mdt",
+   "size": 7660,
+   "sha256": "14f2f23793694f138ce6843b3c1cabf0cc48a9bcaf4dce2d9f6a7805a835b33f",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b00",
+   "size": 788,
+   "sha256": "c26cf2e6ac962065f71006729bdebeb4f246bdfba53d4a284731988e13c6e4bc",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b01",
+   "size": 7672,
+   "sha256": "7ea4c97c5cad658560fb34bbe77d24bcef4650304b8c25cb8d1ca804d5ef2dbc",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b02",
+   "size": 82680,
+   "sha256": "73d48229e7e1cd6447e782b424ea41c5d5ba835c326c419ceb6b2ea66c6f796d",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b03",
+   "size": 247232,
+   "sha256": "b8585622a1025ce7eb2c5c9e7bcfc6160f147a16e9fc42ab3adb51ee85cbdfa6",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b04",
+   "size": 2077548,
+   "sha256": "9c984be96ad7c403edfd5c158345f97079ec79f681340a46f1001772c2af851b",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b05",
+   "size": 1733228,
+   "sha256": "46518bb26f3760f74996b710cbee88758b43dbb417b9c5ab96d2d957e971e9de",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b06",
+   "size": 63642,
+   "sha256": "745aeadf6a134ec1ce6d6ffa6b5de722e058f4c6ea5ebe5bbcd65911da275d45",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b07",
+   "size": 28972,
+   "sha256": "e4c7fbad3644924998f9eaade610ee41c318d627bd9d56073b51183a08c8dcee",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b08",
+   "size": 167700,
+   "sha256": "ea804a79de6fc15cfecd71154325b0929c54d0271ea492bede51b1355e213233",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b09",
+   "size": 111164,
+   "sha256": "ff55e60bf487220654c48e21dd3a5e813ea3b1516c130a024a04ad14449070f2",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b10",
+   "size": 82,
+   "sha256": "a8b6b0f2032cd8ba8eaff1ffe6f5a83cb36d462ed847a4e2b32457f41bb971c9",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b11",
+   "size": 8192,
+   "sha256": "9f1dcbc35c350d6027f98be0f5c8b43b42ca52b7604459c0c42be3aa88913d47",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b12",
+   "size": 62268,
+   "sha256": "82bf6c9d790dd3b43e81c1833d036d3d8a105e83574006f085581bd01273dc5d",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b13",
+   "size": 28084,
+   "sha256": "5009579e0c663f6ce626adef0040b1e769243bcc887dc5064562430c31b224c3",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b14",
+   "size": 234528,
+   "sha256": "8fb78d8b652ea0c02d08b0380b41eb1ee86523552199f513cebf402359394ef7",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b15",
+   "size": 164,
+   "sha256": "7adc96ae6bb49484750116757e66ab532d7c7633d576fa18b43cfad01ad02ba7",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b16",
+   "size": 2340796,
+   "sha256": "7a010502d676be9b5c152fbcccef1fd3103e41e738a151d913c340ea9c086b6a",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b17",
+   "size": 53256,
+   "sha256": "71c54d25021d7d51ddfd194b9caa3ee7c5bdad0ef8fed7735b8c6dbcc37cfede",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b18",
+   "size": 14956,
+   "sha256": "a14959c002263d70fdb9f74e5d1e36a049470f5ef482effc8fdf35a3c5cb9468",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b19",
+   "size": 139584,
+   "sha256": "d46d50ce173aae4179da50b9b774c08866246ddb3d93781bbdfbd15e7c384736",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b20",
+   "size": 56444,
+   "sha256": "16298e1b09520e5b767dce0b1b3afb27caecaee3917c2e09b47b024176ab13e6",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.b21",
+   "size": 698556,
+   "sha256": "21579c06340b3bfbba181db2701904b2513e63b95c0a967a709ab084a154e96d",
+   "group": "vendor"
+  },
+  {
+   "path": "qcom/sm8250/realme/bitra/slpi.mdt",
+   "size": 8460,
+   "sha256": "7e946eaee614e576fb679e1ad009ecb7913a016684bfafda1b04e2a67f2fa231",
+   "group": "vendor"
+  }
+ ]
+}

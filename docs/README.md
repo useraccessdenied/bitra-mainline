@@ -22,6 +22,7 @@ Numbering continues the `bitra` workspace docs (00–17 cover LineageOS and Droi
 | [20-mainline-research-firmware-rust-connectivity.md](20-mainline-research-firmware-rust-connectivity.md) | Research: firmware, Rust vs C, connectivity (SDX55M modem), order of work |
 | [19-bitra-hardware-map.md](19-bitra-hardware-map.md) | Hardware map from the stock merged device tree |
 | [18-mainline-bringup.md](18-mainline-bringup.md) | Historical stage-1 bring-up log (RAM boot, ABL DTB shim, panel, Wi-Fi, BT, UFS) |
+| [FIRMWARE.md](FIRMWARE.md) | The firmware files the kernel loads, where they come from, the extraction tool and manifest, sharing rules |
 
 Conventions: results are dated; "verified" means seen on the phone; every kernel change is committed in the fork (branch `bitra`) and exported to `patches/series/`
 (`python3 scripts/export_patches.py`); upstream-worthy fixes get a row in docs/24; hardware changes update docs/27 in the same commit.

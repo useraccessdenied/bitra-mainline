@@ -29,6 +29,7 @@ Biggest gaps: cellular modem, camera and sensors (CDSP/SLPI firmware is extracte
 | `configs/bitra_defconfig` | `savedefconfig` of the working kernel build |
 | `patches/` | The kernel changes as a `git am` series (`patches/series/`, base in `patches/BASE`) |
 | `tools/` | `flash-boot.sh` (hash-checked flash of the `boot` partition from the phone), small freestanding aarch64 helpers (`bitra-reboot`, `bitra-drm`, `bitra-evtest`, `bitra-failnth`), Python hardware tests that run on the phone (`bitra-haptic.py`, `bitra-nfc.py`, `gpu-hang-test.py`, `nm-wifi-from-wpa.py`, `tone.py`, `extract-dsp-firmware.py`) and `gpu-stress.sh` and `soak.sh` (display soak / fault-injection harness) |
+| `tools/bitra-firmware.py`, `firmware/manifest.json` | Get the firmware files from your own phone, firmware zip or linux-firmware, and verify them (docs/FIRMWARE.md) |
 | `third_party/` | Fetched/vendored inputs (Alpine packages, touch driver series); mostly gitignored |
 | `releases/`, `build/` | Build outputs (gitignored) |
 
