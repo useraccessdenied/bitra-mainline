@@ -41,7 +41,7 @@ So: UEFI -> boot manager -> HakiOS loader -> framebuffer text works; what is mis
   provide Apple's `identity.h` from an IPSW. None of this is done.
 
 ## Reproduce
-Sources are kept outside the repo (`~/projects/mu-silicium-src`): `git clone --recursive --depth 1 https://github.com/Project-Silicium/Mu-Silicium`, a Python venv with `pip-requirements.txt`,
+Sources are kept outside the repo (`~/projects/bitra/mu-silicium`): `git clone --recursive --depth 1 https://github.com/Project-Silicium/Mu-Silicium`, a Python venv with `pip-requirements.txt`,
 the AOSP clang (has lld-link), a shim directory with an empty `uuid/uuid.h` plus a `libuuid.so` symlink (no sudo, host has only the runtime library), and
 `sed -i 's/"scope": "edk2-build"/"scope": "unused-x86-nasm"/' Mu_Basecore/BaseTools/Bin/nasm_ext_dep.yaml` (the x86 nasm NuGet package needs Mono and is not used for AArch64).
 `uefi/mu-silicium-bitra/` holds the changes as patches (`mu-silicium-bitra.patch`: `EnableUfsIOC`, `PcdFrameBufferDelay`; `mu-silicium-binaries-bitra.patch`: the `[AUTO]` list) and `build.sh`.

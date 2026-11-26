@@ -14,7 +14,7 @@ import argparse, gzip, hashlib, io, os, stat, struct, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# the Android build repo (bitra-lineageos) supplies busybox, mkbootimg and the Droidian DTB carrier; override with BITRA_REPO
+# the Android build repo (bitra-android) supplies busybox, mkbootimg and the Droidian DTB carrier; override with BITRA_REPO
 BITRA = Path(os.environ.get("BITRA_REPO", ROOT.parent / "bitra"))
 BUSYBOX = BITRA / "roms/lineageos/a17/kernel/realme/sm8250/KernelSU/userspace/ksud/bin/aarch64/busybox"
 MKBOOTIMG = BITRA / "roms/lineageos/a16/system/tools/mkbootimg/mkbootimg.py"

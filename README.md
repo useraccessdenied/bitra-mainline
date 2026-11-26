@@ -1,4 +1,4 @@
-# bitra-mainline
+# bitra-port
 
 Mainline Linux on the **realme GT Neo 2** (RMX3370, codename `bitra`, Snapdragon 870 / SM8250-AC): tooling, notes and patch exports.
 
@@ -6,8 +6,8 @@ Mainline Linux on the **realme GT Neo 2** (RMX3370, codename `bitra`, Snapdragon
 > postmarketOS/Nura or any kernel maintainer. Use at your own risk: this repo writes to the phone's `userdata` partition and never to the firmware LUNs.
 
 Companion repos
-- kernel: <https://github.com/useraccessdenied/linux-sm8250-realme-bitra> (branch `bitra`, based on `omnipha/linux-qualcomm-sm8250` 7.2.0)
-- Android / Droidian build repo: <https://github.com/useraccessdenied/bitra-lineageos>
+- kernel: <https://github.com/useraccessdenied/linux-mainline-bitra> (branch `bitra`, based on `omnipha/linux-qualcomm-sm8250` 7.2.0)
+- Android / Droidian build repo: <https://github.com/useraccessdenied/bitra-android>
 
 ## Status (2026-11-22)
 Mainline **7.2.0 boots the phone into Alpine Linux 3.24 from UFS (`userdata`)**: console on the panel (fbcon), touchscreen, Wi-Fi, USB-NCM + SSH shells,
