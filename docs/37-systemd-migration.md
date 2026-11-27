@@ -48,3 +48,8 @@ Phosh's device-name setting and BlueZ name via hostnamed; native logind (no elog
 
 ## Definition of done for the migration
 Same hardware status as docs/27 (display, touch, GPU, Wi-Fi with the OEM board data, Bluetooth with its own address, audio, sensors with rotation, USB-NCM shell, battery gauge, haptics, NFC), `userdata` flashed (needs the owner's explicit approval: it wipes the Alpine root), recovery path documented, `docs/27` and a new doc updated, the rootfs reproducible from the repo with no root and no containers.
+
+## Evidence collected while on Alpine (for the decision and the new recipes)
+- 2026-11-27: after the clean flash Phosh never started because the builder's one-line `/bin/bash` stand-in (needed by the bitra-agent's shell wrapper) replaced the real bash that `gnome-session`'s wrapper needs (docs/38). Busybox-vs-GNU differences have cost time repeatedly (`ip -br`, `telnetd`/`udhcpd` in busybox-extras, `script`, `losetup`, `su`). On a glibc distro the agent can use the real bash, ssh and `iproute2`.
+- Acceptance check for every image, both variants: boot to the Phosh/Plasma Mobile home screen and verify the session process (`pidof phosh` / `plasmashell`) before calling the image done.
+
