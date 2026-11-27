@@ -36,6 +36,15 @@
 - **Pipeline**: `tools/release.py VERSION --rom-zip ... --firmware-zip ...` builds `releases/VERSION/{boot.img,userdata.img,super.img,SHA256SUMS}`; users run `fastboot flash boot|userdata|super`. Same recipe for the later Mobian and Fedora Plasma Mobile `userdata.img` files; `boot.img` and `super.img` are shared. `AGENTS.md` now lists `super` as an allowed write target.
 - Open: flash test of sparse `userdata.img` and plain `super.img` with fastboot on this bootloader; the Wi-Fi OEM board data; whether the DSP/GPU firmware requests see the bind mount early enough (checked on the first release boot); empty-registry behaviour (the default template may be enough now that SMEM 130 is filled).
 
+## Flashing order (owner, 2026-11-27): userdata LAST, erase it first
+Fastboot on this bootloader hangs after a `userdata` flash: `getvar` times out and only `fastboot reboot` works (the owner then had to reboot to the bootloader by hand). So the order for the release is:
+1. `fastboot flash super super.img`
+2. `fastboot flash boot boot.img`
+3. `fastboot erase userdata`
+4. `fastboot flash userdata userdata.img`
+5. `fastboot reboot`
+`userdata` is always the last write, and it is erased before it is flashed. (The 0.1-test flash did `super`, `userdata`, then `boot`, and had to be recovered by hand.) The agent's `flash` command needs an `erase` step and a flash-order check for this.
+
 ## Release build, first implementation (this session)
 - `scripts/build_mainline_boot.py NAME --release` now uses a separate minimal initramfs (`RELEASE_INIT`): watchdog petting, logo, wait for `bitra.root`, mount, keep pstore, `switch_root`, reboot after 120 s. It carries only busybox, firmware and the logo (no gadget, telnetd/udhcpd, `bitra-switchroot`, reboot helper, DRM/evtest/failnth tools, soak script, wpa_supplicant/iw/bluez tools). Built as `releases/mainline-boot-11.img`.
 - `scripts/build_alpine_rootfs.py --release` leaves out `bitra-net`, `bitra-telnetd`, `bitra-udhcpd`, `bitra-diag` (the `TEST_ONLY_SERVICES`).
