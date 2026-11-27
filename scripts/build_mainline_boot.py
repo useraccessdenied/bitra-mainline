@@ -136,8 +136,9 @@ def firmware_entries():
     D, F = _st.S_IFDIR | 0o755, _st.S_IFREG | 0o644
     files = []
     for rel in FW_FILES:
+        own = ROOT / "third_party/firmware" / rel   # a file generated for this phone (e.g. ath11k board-2.bin with the OEM board data) wins
         src = FW_ROOT / (rel + ".xz")
-        files.append((rel, lzma.open(src).read() if src.exists() else (FW_ROOT / rel).read_bytes()))
+        files.append((rel, own.read_bytes() if own.exists() else lzma.open(src).read() if src.exists() else (FW_ROOT / rel).read_bytes()))
     for rel, src in EXTRA_FW:
         if src.exists():
             files.append((rel, src.read_bytes()))

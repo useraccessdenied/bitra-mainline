@@ -316,8 +316,9 @@ def inner(a):
     if soak.exists():
         put("usr/local/bin/soak.sh", soak.read_bytes(), 0o755)
     for rel in FW_FILES:
+        own = ROOT / "third_party/firmware" / rel   # generated for this phone (ath11k board-2.bin with the OEM board data) wins
         xz = FW_ROOT / (rel + ".xz")
-        put("lib/firmware/" + rel, lzma.open(xz).read() if xz.exists() else (FW_ROOT / rel).read_bytes())
+        put("lib/firmware/" + rel, own.read_bytes() if own.exists() else lzma.open(xz).read() if xz.exists() else (FW_ROOT / rel).read_bytes())
     keys = [p.read_text() for p in sorted(Path.home().glob(".ssh/*.pub"))]
     if keys:
         put("root/.ssh/authorized_keys", "".join(keys), 0o600)
