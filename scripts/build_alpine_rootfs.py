@@ -23,7 +23,7 @@ OUT = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out"))
 FW_ROOT = Path(os.environ.get("FIRMWARE_DIR", "/usr/lib/firmware"))
 FW_FILES = ["regulatory.db", "regulatory.db.p7s", "ath11k/QCA6390/hw2.0/amss.bin", "ath11k/QCA6390/hw2.0/m3.bin",
             "ath11k/QCA6390/hw2.0/board-2.bin", "qca/htbtfw20.tlv", "qca/htnv20.bin"]
-PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", "e2fsprogs", "e2fsprogs-extra", "bluez", "bluez-btmgmt", "dbus",
+PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", "e2fsprogs", "e2fsprogs-extra", "bash", "bluez", "bluez-btmgmt", "dbus",
             "wireless-regdb", "nano", "htop", "util-linux", "kbd", "curl", "i2c-tools", "evtest", "python3",
             # graphical session (docs/29): sway + Mesa (freedreno/turnip) + seat/udev stack
             "sway", "seatd", "foot", "grim", "wlr-randr", "swaybg", "mesa-dri-gallium", "mesa-egl", "mesa-gles", "mesa-gbm",
@@ -306,7 +306,11 @@ def inner(a):
     put("etc/bitra-udhcpd.conf", UDHCPD_CONF)
     put("etc/motd", "bitra (realme GT Neo 2) - Alpine on mainline Linux\n")
     put("usr/bin/systemctl", SYSTEMCTL_SHIM, 0o755)
-    put("bin/bash", "#!/bin/busybox sh\nexec /bin/busybox ash\n", 0o755)   # the agent's shell wrapper wants a bash
+    # The agent's shell wrapper wants a bash. NEVER overwrite the real one: gnome-session's wrapper runs `bash -c "exec -l $SHELL -c ..."`, and a stand-in that
+    # ignores -c made every Phosh session end at once (docs/38, 2026-11-27). Only create the stand-in when no real bash is installed.
+    if not (root / "bin/bash").exists():
+        put("bin/bash", "#!/bin/busybox sh\nexec /bin/busybox ash\n", 0o755)
+    assert (root / "bin/bash").read_bytes()[:4] == b"\x7fELF", "/bin/bash is not the real bash (Phosh needs it)"
     (root / "usr/local/sbin").mkdir(parents=True, exist_ok=True)
     (root / "usr/local/sbin/busybox-bitra").symlink_to("/bin/busybox")
     for name, hdr in TOOLS:
