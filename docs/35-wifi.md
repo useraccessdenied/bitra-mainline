@@ -13,4 +13,4 @@
 - Bluetooth address: still the fixed `local-bd-address` in the DT (02:b1:7a:05:5a:ad); the same SoC-serial derivation can be done in userspace once `btmgmt` is available (not installed).
 
 ## State
-Installed live in the rootfs (board-2.bin, service, NM config; the generic file kept as `board-2.bin.generic`). The flashed `mainline-boot-8` still has the old initramfs board file and DT: the next flashed image needs the variant DT and the new board-2.bin. Not measured: whether range/throughput improved. Open: scan "Resource busy" after roaming (check for a firmware crash before the first failure), WoWLAN/power save, BT address, regulatory.
+Installed live in the rootfs (board-2.bin, service, NM config; the generic file kept as `board-2.bin.generic`) and flashed in `mainline-boot-9` (variant DT + board-2.bin in the initramfs); verified after a normal reboot. Not measured: whether range/throughput improved. Open: scan "Resource busy" after roaming (check for a firmware crash before the first failure), WoWLAN/power save, BT address, regulatory.
