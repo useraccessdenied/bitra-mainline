@@ -6,6 +6,9 @@ Last full review: **2026-11-22** (quick tests of keys, haptics, NFC, suspend the
 Status: **Working** = verified on the phone | **Partial** = works with gaps (listed) | **Not working** = understood, not done | **Untested** = driver/device present, function not verified | **Not tried** = no work yet | **Skip** = decided not to support.
 "Verified" below means seen on the real phone in a session; details live in the doc named in the last column. Open upstream-side kernel bugs are in docs/24, deferred owner items in docs/known-issues.md.
 
+## Release 0.5 owner verification (2026-11-27, flashed: boot.img + super.img + userdata.img, docs/38)
+Verified by the owner on the flashed release images: UI smooth (GPU with the ZAP shader from boot.img), **Bluetooth pairs**, **audio works**, **Phosh auto-rotate works**, **Wi-Fi solid** (5 GHz, 80 MHz 2x2, link rate 650/780 Mbit/s at -62 dBm; power save is on; throughput not measured on a LAN peer, internet downloads were limited by the remote servers). Verified over ssh: accelerometer, light, proximity and magnetometer readings, ADSP/SLPI boot at ~4 s without help, wlan0 with the OEM board data. Not yet tried: compass heading (owner will), Wi-Fi WoWLAN/roaming, A2DP/HFP details. The status rows below are older and say less than this.
+
 ## Platform / boot
 | Item | Status | Evidence / gaps | Next step | Doc |
 |---|---|---|---|---|
