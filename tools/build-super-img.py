@@ -50,6 +50,7 @@ def main():
     ap.add_argument("--rom-zip", required=True)
     ap.add_argument("--firmware-zip")
     ap.add_argument("-o", "--out", default=str(ROOT / "releases/super.img"))
+    ap.add_argument("--zap-out", help="also copy the a650_zap.* files into this directory (for the boot.img builder, BITRA_ZAP_DIR)")
     ap.add_argument("--sparse", action="store_true", help="also write OUT.sparse (Android sparse, for fastboot)")
     a = ap.parse_args()
     for t in ("simg2img", "fsck.erofs", "mke2fs", "7z"):
@@ -80,6 +81,10 @@ def main():
         for n in sorted((v / "firmware").glob("a650_zap.*")):
             if n.suffix != ".elf":
                 shutil.copy2(n, tree / FWDIR / n.name)
+        if a.zap_out:
+            Path(a.zap_out).mkdir(parents=True, exist_ok=True)
+            for n in sorted((tree / FWDIR).glob("a650_zap.*")):
+                shutil.copy2(n, Path(a.zap_out) / n.name)
         files = sorted(p for p in tree.rglob("*") if p.is_file())
         (tree / "PROPRIETARY.txt").write_text(
             "Proprietary firmware and configuration files (Qualcomm / realme / OPPO), extracted unmodified from realme RMX3370 stock firmware.\n"

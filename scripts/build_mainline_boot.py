@@ -141,7 +141,12 @@ def firmware_entries(release=False):
         files.append((rel, own.read_bytes() if own.exists() else lzma.open(src).read() if src.exists() else (FW_ROOT / rel).read_bytes()))
     for rel, src in EXTRA_FW:
         if release and "/realme/" in rel:
-            continue   # the ZAP shader comes from the super.img vendor image, mounted by the initramfs
+            # the GPU asks for the ZAP shader before the root exists: ship it in boot.img (OS independent), taken from the same extraction as super.img
+            zd = os.environ.get("BITRA_ZAP_DIR")
+            src = Path(zd) / rel.rsplit("/", 1)[1] if zd else None
+            if src is None or not src.exists():
+                print("WARNING: BITRA_ZAP_DIR not set / ZAP file missing: boot.img without the GPU ZAP shader (GPU then depends on the super mount)", file=sys.stderr)
+                continue
         if src.exists():
             files.append((rel, src.read_bytes()))
         else:
@@ -229,7 +234,7 @@ PREROOT = r'''# proprietary vendor files (GPU ZAP shader, DSP firmware, sensor c
 mkdir -p /vendor /lib/firmware/qcom/sm8250/realme/bitra
 ( i=0; while [ $i -lt 90 ]; do
     for d in /sys/class/block/sd*; do grep -qx "PARTNAME=super" $d/uevent 2>/dev/null && SUP=/dev/${d##*/}; done
-    [ -n "$SUP" ] && mount -t ext4 -o ro "$SUP" /vendor 2>/dev/null && { mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra; break; }
+    [ -n "$SUP" ] && mount -t ext4 -o ro "$SUP" /vendor 2>/dev/null && { for f in /vendor/firmware/qcom/sm8250/realme/bitra/*; do [ -e /lib/firmware/qcom/sm8250/realme/bitra/${f##*/} ] || ln -s $f /lib/firmware/qcom/sm8250/realme/bitra/${f##*/}; done; break; }
     i=$((i+1)); sleep 1; done ) &
 @OEM_BOARD_FN@
 # per-unit Wi-Fi board data from the phone's own persist partition (read-only): build an OEM board-2.bin in RAM, the rootfs applies it
@@ -266,8 +271,8 @@ while [ $n -lt 120 ]; do
     P=/newroot/var/lib/pstore/early-$(cut -d. -f1 /proc/uptime); mkdir -p $P; cp /pstore/* $P/ 2>/dev/null
     mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore /newroot/run /newroot/vendor
     mount --move /vendor /newroot/vendor 2>/dev/null
-    # the firmware bind must survive the switch: the DSP drivers (modules loaded by udev in sysinit) probe ~0.5 s after the root is up
-    mkdir -p /newroot/lib/firmware/qcom/sm8250/realme/bitra; mount --move /lib/firmware/qcom/sm8250/realme/bitra /newroot/lib/firmware/qcom/sm8250/realme/bitra 2>/dev/null
+    # the DSP firmware must be visible in the new root before udev loads the DSP drivers (bind of the moved /vendor): the DSP drivers (modules loaded by udev in sysinit) probe ~0.5 s after the root is up
+    mkdir -p /newroot/lib/firmware/qcom/sm8250/realme/bitra; mount --bind /newroot/vendor/firmware/qcom/sm8250/realme/bitra /newroot/lib/firmware/qcom/sm8250/realme/bitra 2>/dev/null
     [ -s /tmp/oem-board-2.bin ] && cp /tmp/oem-board-2.bin /newroot/lib/firmware/ath11k/QCA6390/hw2.0/board-2.bin
     mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /newroot/run
     for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done

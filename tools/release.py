@@ -5,7 +5,7 @@
 Output: releases/VERSION/{boot.img, userdata.img (Android sparse), super.img (raw ext4, flashed as is), SHA256SUMS}
   fastboot flash boot boot.img ; fastboot flash userdata userdata.img ; fastboot flash super super.img
 userdata.img is small and grows to the partition on first boot (bitra-growfs); super.img carries the proprietary vendor files."""
-import argparse, hashlib, shutil, subprocess, sys
+import argparse, hashlib, os, shutil, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,17 +28,18 @@ def main():
     a = ap.parse_args()
     out = ROOT / "releases" / a.version; out.mkdir(parents=True, exist_ok=True)
     rel = ROOT / "releases"
+    cmd = [PY, str(ROOT / "tools/build-super-img.py"), "--rom-zip", a.rom_zip, "-o", str(out / "super.img"), "--zap-out", str(rel / f"zap-{a.version}")]
+    if a.firmware_zip:
+        cmd += ["--firmware-zip", a.firmware_zip]
+    subprocess.run(cmd, check=True)
     if not a.skip_boot:
-        subprocess.run([PY, str(ROOT / "scripts/build_mainline_boot.py"), f"release-{a.version}", "--release"], check=True)
+        subprocess.run([PY, str(ROOT / "scripts/build_mainline_boot.py"), f"release-{a.version}", "--release"], check=True,
+                       env={**os.environ, "BITRA_ZAP_DIR": str(rel / f"zap-{a.version}")})   # ZAP shader from the super.img extraction
         shutil.copy2(rel / f"release-{a.version}.img", out / "boot.img")
     if not a.skip_rootfs:
         raw = rel / f"userdata-{a.version}.raw"
         subprocess.run([PY, str(ROOT / "scripts/build_alpine_rootfs.py"), "--release", "--size-mb", str(a.rootfs_size_mb), "--out", str(raw)], check=True)
         subprocess.run([PY, str(ROOT / "tools/mksparse.py"), str(raw), str(out / "userdata.img")], check=True)   # RAW chunks only (never DONT_CARE): safe over an un-erased partition
-    cmd = [PY, str(ROOT / "tools/build-super-img.py"), "--rom-zip", a.rom_zip, "-o", str(out / "super.img")]
-    if a.firmware_zip:
-        cmd += ["--firmware-zip", a.firmware_zip]
-    subprocess.run(cmd, check=True)
     names = [n for n in ("boot.img", "userdata.img", "super.img") if (out / n).exists()]
     (out / "SHA256SUMS").write_text("".join(f"{sha(out / n)}  {n}\n" for n in names))
     print((out / "SHA256SUMS").read_text())
