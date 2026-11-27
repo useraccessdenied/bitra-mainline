@@ -131,15 +131,17 @@ STOCK_FW = BITRA / "firmware/stock-a13/v-extract/vendor/firmware"
 EXTRA_FW = [("qcom/a650_sqe.fw.zst", ROOT / "third_party/firmware/qcom/a650_sqe.fw.zst"),
             ("qcom/a650_gmu.bin.zst", ROOT / "third_party/firmware/qcom/a650_gmu.bin.zst")] + \
            [("qcom/sm8250/realme/bitra/" + n, STOCK_FW / n) for n in ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02")]
-def firmware_entries():
+def firmware_entries(release=False):
     import stat as _st
     D, F = _st.S_IFDIR | 0o755, _st.S_IFREG | 0o644
     files = []
     for rel in FW_FILES:
-        own = ROOT / "third_party/firmware" / rel   # a file generated for this phone (e.g. ath11k board-2.bin with the OEM board data) wins
+        own = Path("/nonexistent") if release else ROOT / "third_party/firmware" / rel   # (release: never per-unit data)  a file generated for this phone (e.g. ath11k board-2.bin with the OEM board data) wins
         src = FW_ROOT / (rel + ".xz")
         files.append((rel, own.read_bytes() if own.exists() else lzma.open(src).read() if src.exists() else (FW_ROOT / rel).read_bytes()))
     for rel, src in EXTRA_FW:
+        if release and "/realme/" in rel:
+            continue   # the ZAP shader comes from the super.img vendor image, mounted by the initramfs
         if src.exists():
             files.append((rel, src.read_bytes()))
         else:
@@ -217,6 +219,13 @@ mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
 mkdir -p /pstore /config /newroot
 mount -t pstore pstore /pstore 2>/dev/null
+# proprietary vendor files (GPU ZAP shader, DSP firmware, sensor configs) live in the super partition (super.img, docs/38): mount it read-only and
+# put its firmware where the kernel looks, before the GPU asks for the ZAP; the new root gets /vendor moved in and binds the rest (bitra-vendor)
+mkdir -p /vendor /lib/firmware/qcom/sm8250/realme/bitra
+( i=0; while [ $i -lt 90 ]; do
+    for d in /sys/class/block/sd*; do grep -qx "PARTNAME=super" $d/uevent 2>/dev/null && SUP=/dev/${d##*/}; done
+    [ -n "$SUP" ] && mount -t ext4 -o ro "$SUP" /vendor 2>/dev/null && { mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra; break; }
+    i=$((i+1)); sleep 1; done ) &
 ( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &
 # boot logo as soon as the panel's framebuffer exists (the msm driver probes after ~10-25 s)
 ( i=0; while [ ! -e /dev/fb0 ] && [ $i -lt 120 ]; do sleep 1; i=$((i+1)); done; [ -e /dev/fb0 ] && gunzip -c /logo.raw.gz > /dev/fb0 ) &
@@ -227,7 +236,8 @@ while [ $n -lt 120 ]; do
   for d in /sys/class/block/sd*; do grep -qx "PARTNAME=$CMDROOT" $d/uevent 2>/dev/null && DEV=/dev/${d##*/}; done
   if [ -n "$DEV" ] && mount -t ext4 -o rw,noatime "$DEV" /newroot; then
     P=/newroot/var/lib/pstore/early-$(cut -d. -f1 /proc/uptime); mkdir -p $P; cp /pstore/* $P/ 2>/dev/null
-    mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore /newroot/run
+    mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore /newroot/run /newroot/vendor
+    mount --move /vendor /newroot/vendor 2>/dev/null
     mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /newroot/run
     for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done
     exec switch_root /newroot /sbin/init
@@ -244,7 +254,7 @@ if sys.argv[2:3] == ["--release"]:
     b.INIT = RELEASE_INIT
     def _cpio_release(entries):
         import stat as _st
-        return _orig_cpio(entries + firmware_entries() + [("logo.raw.gz", _st.S_IFREG | 0o644, _logo, None)])
+        return _orig_cpio(entries + firmware_entries(True) + [("logo.raw.gz", _st.S_IFREG | 0o644, _logo, None)])
     b.cpio_newc = _cpio_release
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]

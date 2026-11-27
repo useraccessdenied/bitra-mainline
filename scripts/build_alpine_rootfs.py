@@ -148,6 +148,46 @@ start() {
 }
 """
 
+BITRA_VENDOR = """#!/sbin/openrc-run
+description="bind the proprietary vendor files from the super partition (mounted read-only by the initramfs at /vendor, docs/38) to where the kernel and hexagonrpcd look"
+depend() { need root; before udev hexagonrpcd-sdsp bitra-sensors; }
+start() {
+    q=/usr/share/qcom/sm8250/realme/bitra
+    if [ ! -d /vendor/firmware ]; then
+        mkdir -p /vendor
+        mount -t ext4 -o ro /dev/disk/by-partlabel/super /vendor 2>/dev/null || { eerror "vendor image (super partition) not found: flash super.img"; return 0; }
+    fi
+    mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra
+    mount --bind /vendor/sensors/config $q/sensors/config
+    mount --bind /vendor/sensors/sns_reg_config $q/sensors/sns_reg.conf
+    return 0
+}
+stop() {
+    for m in /usr/share/qcom/sm8250/realme/bitra/sensors/sns_reg.conf /usr/share/qcom/sm8250/realme/bitra/sensors/config /lib/firmware/qcom/sm8250/realme/bitra; do umount $m 2>/dev/null; done
+    return 0
+}
+"""
+
+BITRA_PERSIST = """#!/sbin/openrc-run
+description="first boot: copy this unit's sensor registry from its own persist partition (mounted read-only) into the served registry directory"
+depend() { need root; before hexagonrpcd-sdsp; }
+start() {
+    q=/usr/share/qcom/sm8250/realme/bitra/sensors/registry
+    [ -n "$(ls $q/registry 2>/dev/null)" ] && return 0
+    mkdir -p /mnt/persist
+    mount -t ext4 -o ro,noload /dev/disk/by-partlabel/persist /mnt/persist 2>/dev/null || { ewarn "persist not readable: sensors start uncalibrated"; return 0; }
+    if [ -d /mnt/persist/sensors/registry/registry ]; then
+        mkdir -p $q/registry
+        cp -a /mnt/persist/sensors/registry/registry/. $q/registry/
+        cp -a /mnt/persist/sensors/registry/sns_reg_version $q/ 2>/dev/null
+        chown -R fastrpc:fastrpc $q
+        einfo "sensor registry copied from persist"
+    fi
+    umount /mnt/persist
+    return 0
+}
+"""
+
 TEST_ONLY_SERVICES = ("bitra-net", "bitra-telnetd", "bitra-udhcpd", "bitra-diag")
 
 BITRA_DIAG = """#!/sbin/openrc-run
@@ -298,6 +338,9 @@ def inner(a):
     put("etc/init.d/bitra-net", BITRA_NET, 0o755)
     put("etc/init.d/bitra-growfs", BITRA_GROWFS, 0o755)
     put("etc/init.d/bitra-diag", BITRA_DIAG, 0o755)
+    if RELEASE:
+        put("etc/init.d/bitra-vendor", BITRA_VENDOR, 0o755)
+        put("etc/init.d/bitra-persist", BITRA_PERSIST, 0o755)
     put("etc/init.d/bitra-pstore", BITRA_PSTORE, 0o755)
     put("etc/init.d/bitra-time", BITRA_TIME, 0o755)
     put("etc/bitra-build-time", str(int(__import__("time").time())) + "\n")
@@ -324,7 +367,9 @@ def inner(a):
     if soak.exists():
         put("usr/local/bin/soak.sh", soak.read_bytes(), 0o755)
     for rel in FW_FILES:
-        own = ROOT / "third_party/firmware" / rel   # generated for this phone (ath11k board-2.bin with the OEM board data) wins
+        own = ROOT / "third_party/firmware" / rel   # generated for this phone (ath11k board-2.bin with the OEM board data) wins; never in a release (per unit data)
+        if RELEASE:
+            own = Path("/nonexistent")
         xz = FW_ROOT / (rel + ".xz")
         put("lib/firmware/" + rel, own.read_bytes() if own.exists() else lzma.open(xz).read() if xz.exists() else (FW_ROOT / rel).read_bytes())
     keys = [p.read_text() for p in sorted(Path.home().glob(".ssh/*.pub"))]
@@ -338,7 +383,7 @@ def inner(a):
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("elogind", "default"), ("polkit", "default"), ("tinydm", "default"), ("networkmanager", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
-                     ("bitra-growfs", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
+                     ("bitra-growfs", "boot"), ("bitra-vendor", "boot"), ("bitra-persist", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if RELEASE and svc in TEST_ONLY_SERVICES:
             continue   # release: no USB-NCM link, telnet shell, DHCP server or diagnostics on the panel; test images keep them
@@ -374,7 +419,7 @@ def inner(a):
     zap = BITRA / "firmware/stock-a13/v-extract/vendor/firmware"
     # DSP firmware (tools/extract-dsp-firmware.py from the modem partition backup); only the ADSP is enabled in the DT so far
     dsp = ROOT / "third_party/firmware/qcom/sm8250/realme/bitra"
-    for pat in ("adsp.*", "slpi.*"):
+    for pat in (() if RELEASE else ("adsp.*", "slpi.*")):   # release: from the super.img vendor image (bitra-vendor)
         for f in sorted(dsp.glob(pat)):
             put("lib/firmware/qcom/sm8250/realme/bitra/" + f.name, f.read_bytes())
     # sensor configuration served to the SLPI by hexagonrpcd (docs/32): vendor + odm JSON configs and sns_reg.conf from the stock ROM extracts
@@ -387,13 +432,16 @@ def inner(a):
     drop = _re.compile(r"^(sxr2130_.*|wigig_sensing_0|pah_813x_0_reg|kona_bu52053nvx_0|bmi160|kona_qrd_bmi160|bmi26x_0|kona_qrd_bmi26x_0|kona_qrd_lsm6dsm|kona_qrd_lsm6dso|"
                        r"kona_sx932x_0|sx932x_0|kona_qrd_sx933x_0|kona_qrd_lps22hh_0|lps22hh_0|kona_qrd_tmd2725_0|stk3x5x_0|tcs3701|sns_heart_rate|sns_wrist_pedo|"
                        r"kona_qrd_cct|kona_qrd_cct_rear|kona_qrd_tcs3408_rear|tcs3408|kona_hdk_ak991x_0|kona_qrd_ak991x_0)\.json$")
-    for src, sub in ((stock / "v-extract/vendor/etc/sensors/config", "sensors/config"), (stock / "o-extract/odm/etc/sensor/config", "sensors/config")):
+    (root / qroot / "sensors/config").mkdir(parents=True, exist_ok=True)   # release: bitra-vendor binds the vendor image here
+    for src, sub in (() if RELEASE else ((stock / "v-extract/vendor/etc/sensors/config", "sensors/config"), (stock / "o-extract/odm/etc/sensor/config", "sensors/config"))):
         if src.is_dir():
             for f in sorted(src.iterdir()):
                 if drop.match(f.name):
                     continue
                 put(f"{qroot}/{sub}/{f.name}", f.read_bytes())
-    if (stock / "v-extract/vendor/etc/sensors/sns_reg_config").exists():
+    if RELEASE:
+        put(f"{qroot}/sensors/sns_reg.conf", "")   # bind mount point
+    elif (stock / "v-extract/vendor/etc/sensors/sns_reg_config").exists():
         put(f"{qroot}/sensors/sns_reg.conf", (stock / "v-extract/vendor/etc/sensors/sns_reg_config").read_bytes())
     (root / qroot / "sensors/registry/registry").mkdir(parents=True, exist_ok=True)
     # platform identity the SSC config selection reads from /sys/devices/soc0 (mainline's socinfo lacks hw_platform & co.); hw_platform MTP: the stock registry shows the generic alsps driver (kona_qrd_alsps.json, MTP only) ran for proximity on this phone; soc_id 356
@@ -402,7 +450,9 @@ def inner(a):
         put(f"{qroot}/socinfo/{name}", val + "\n")
     # the stock sensor registry (tools/extract-sensor-registry.py from the owner's persist backup; device specific, gitignored): without it SSC enumerates no sensors
     reg = ROOT / "third_party/sensors/registry"
-    if reg.is_dir():
+    if RELEASE:
+        pass   # per-unit calibration: never in a release image; bitra-persist copies it from the phone's own persist partition
+    elif reg.is_dir():
         for f in sorted((reg / "registry").iterdir()):
             put(f"{qroot}/sensors/registry/registry/{f.name}", f.read_bytes())
         put(f"{qroot}/sensors/registry/sns_reg_version", (reg / "sns_reg_version").read_bytes())
@@ -419,7 +469,8 @@ def inner(a):
                 ids[kind] = line.split(":")[2 if kind == "uid" else 2]
     if "uid" in ids and "gid" in ids:
         chroot("/bin/chown", "-R", f"{ids['uid']}:{ids['gid']}", "/usr/share/qcom")
-    for n in ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02"):
+    (root / "lib/firmware/qcom/sm8250/realme/bitra").mkdir(parents=True, exist_ok=True)
+    for n in (() if RELEASE else ("a650_zap.mdt", "a650_zap.b00", "a650_zap.b01", "a650_zap.b02")):
         if (zap / n).exists():
             put("lib/firmware/qcom/sm8250/realme/bitra/" + n, (zap / n).read_bytes())
 
