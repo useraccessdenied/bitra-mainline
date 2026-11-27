@@ -1,9 +1,11 @@
 #!/bin/sh
 # wpa-select-test.sh: stop NetworkManager, run wpa_supplicant by hand with full debug (/tmp/wpa-test.log), connect to the 2.4 GHz network, then switch to the 5 GHz
 # network with select_network and see whether it associates. PSKs are taken from the NetworkManager profiles on the phone (never printed). Restores NetworkManager at the end.
-# Run detached: setsid sh /tmp/wpa-select-test.sh >/dev/null 2>&1 &     Result: /tmp/wpa-select-test.out
+# Run detached: S24=<file> S5=<file> setsid sh /tmp/wpa-select-test.sh >/dev/null 2>&1 &     Result: /tmp/wpa-select-test.out
 D=/etc/NetworkManager/system-connections; O=/tmp/wpa-select-test.out; : > $O
-f24=$(ls $D/bitra-Kapil2.4G* | head -1); f5=$(ls $D/bitra-Kapil-5G* | head -1)
+S24=${S24:?set S24 to the 2.4 GHz connection file name}; S5=${S5:?set S5 to the 5 GHz connection file name}
+f24=$(ls $D/$S24* | head -1); f5=$(ls $D/$S5* | head -1)
+SSID24=$(grep "^ssid=" "$f24" | cut -d= -f2-); SSID5=$(grep "^ssid=" "$f5" | cut -d= -f2-)
 p24=$(grep '^psk=' "$f24" | cut -d= -f2-); p5=$(grep '^psk=' "$f5" | cut -d= -f2-)
 # NetworkManager stores either a passphrase or a 64-hex raw key: the raw key must not be quoted in wpa_supplicant.conf
 q24=\"$p24\"; [ ${#p24} -eq 64 ] && q24=$p24
@@ -12,14 +14,14 @@ cat > /tmp/wpa-test.conf <<EOC
 ctrl_interface=/run/wpa-test
 update_config=0
 network={
- ssid="Kapil2.4G"
+ ssid="$SSID24"
  psk=$q24
  key_mgmt=WPA-PSK
  scan_ssid=1
  id_str="a"
 }
 network={
- ssid="Kapil-5G"
+ ssid="$SSID5"
  psk=$q5
  key_mgmt=WPA-PSK
  scan_ssid=1
@@ -38,7 +40,7 @@ echo "after start: $($W status | grep -E 'wpa_state|ssid=' | tr '\n' ' ')" >> $O
 $W enable_network 1 >/dev/null; $W select_network 1 >> $O
 for i in $(seq 1 15); do sleep 2; s=$($W status | grep wpa_state | cut -d= -f2); echo "t+$((i*2))s $s" >> $O; [ "$s" = COMPLETED ] && break; done
 echo "final: $($W status | grep -E 'wpa_state|ssid=|freq' | tr '\n' ' ')" >> $O
-echo "--- scan results:" >> $O; $W scan_results | grep -i kapil >> $O
+echo "--- scan results:" >> $O; $W scan_results | grep -F "$SSID24" >> $O; $W scan_results | grep -F "$SSID5" >> $O
 killall wpa_supplicant 2>/dev/null; sleep 1
 rm -f /tmp/wpa-test.conf    # holds the PSKs
 rc-service networkmanager start >/dev/null 2>&1

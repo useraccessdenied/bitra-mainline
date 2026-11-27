@@ -10,3 +10,14 @@
 !/tools/
 !/rootfs-overlay/
 __pycache__/
+
+# kernel module build products
+tools/xnulog/*.o
+tools/xnulog/*.ko
+tools/xnulog/*.mod
+tools/xnulog/*.mod.c
+tools/xnulog/*.cmd
+tools/xnulog/.*.cmd
+tools/xnulog/.*.o
+tools/xnulog/Module.symvers
+tools/xnulog/modules.order

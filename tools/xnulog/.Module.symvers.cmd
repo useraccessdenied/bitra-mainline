@@ -1,1 +1,0 @@
-savedcmd_Module.symvers :=  /var/home/kapil/projects/bitra/roms/mainline/out/scripts/mod/modpost -M          -o Module.symvers -n -T modules.order -i /var/home/kapil/projects/bitra/roms/mainline/out/Module.symvers -e 

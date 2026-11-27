@@ -95,8 +95,8 @@ Kernel config snapshot: configs/bitra_defconfig (savedefconfig of the working bu
 
 ## RESULT: Wi-Fi association + throughput, Bluetooth controller (2026-11-21, t-w4 / t-b2)
 **Wi-Fi** (QCA6390, ath11k, generic firmware): both home APs connect from the initramfs with `wpa_supplicant` + busybox `udhcpc`.
-- Kapil2.4G (WPA2-PSK, ch 10): -53 dBm, TX 216 Mbit/s, 50 MB download in 8.7 s (~46 Mbit/s).
-- Kapil-5G (**WPA3-only: SAE, MFP required**, ch 52 DFS, 80 MHz, 2x2 VHT): -64 dBm, TX 351-527 / RX 585 Mbit/s, 50 MB in 3.6-5.4 s (74-110 Mbit/s; internet/CDN-bound).
+- <2.4G-ssid> (WPA2-PSK, ch 10): -53 dBm, TX 216 Mbit/s, 50 MB download in 8.7 s (~46 Mbit/s).
+- <5G-ssid> (**WPA3-only: SAE, MFP required**, ch 52 DFS, 80 MHz, 2x2 VHT): -64 dBm, TX 351-527 / RX 585 Mbit/s, 50 MB in 3.6-5.4 s (74-110 Mbit/s; internet/CDN-bound).
   SAE needs the plaintext passphrase in `sae_password=` (a pre-hashed PSK only works for WPA2). Never commit the config; the initramfs does not contain it
   (stage it with the agent and `put` it to /tmp). The agent's Mac staging dir (data/stage) keeps a copy: delete it after use.
 - Quirks: (a) a `wpa_cli select_network` switch between networks left the driver reporting "Resource busy (-16)" for every scan until `ip link set wlan0 down/up`;

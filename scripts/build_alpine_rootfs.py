@@ -122,7 +122,7 @@ BITRA_TELNETD = """#!/sbin/openrc-run
 description="telnetd on :23 for the bitra-agent, respawned if it dies"
 depend() { need bitra-net; }
 start() {
-    start-stop-daemon -S -b -m -p /run/bitra-telnetd.pid -x /bin/sh -- -c 'while :; do /usr/sbin/telnetd -F -b 0.0.0.0:23 -l /bin/sh; sleep 1; done'
+    start-stop-daemon -S -b -m -p /run/bitra-telnetd.pid -x /bin/sh -- -c 'while :; do /usr/sbin/telnetd -F -b 192.168.2.15:23 -l /bin/sh; sleep 1; done'
 }
 stop() { start-stop-daemon -K -p /run/bitra-telnetd.pid; killall telnetd 2>/dev/null; return 0; }
 """
@@ -246,7 +246,9 @@ tty1::respawn:/sbin/getty 38400 tty1
 ::ctrlaltdel:/sbin/reboot
 ::shutdown:/sbin/openrc shutdown
 """
-SSHD_CONF = "PermitRootLogin yes\nPasswordAuthentication yes\n"
+# key-only ssh (the build host's ~/.ssh/*.pub go to root's authorized_keys); the dev passwords below must never work over the network
+RELEASE = False
+SSHD_CONF = "PermitRootLogin prohibit-password\nPasswordAuthentication no\nKbdInteractiveAuthentication no\n"
 
 
 def install_modules(root):
@@ -289,7 +291,7 @@ def inner(a):
     install_modules(root)
     put("etc/hostname", "bitra\n")
     put("etc/fstab", FSTAB)
-    put("etc/inittab", INITTAB)
+    put("etc/inittab", INITTAB.replace("tty1::respawn:/sbin/getty 38400 tty1\n", "") if RELEASE else INITTAB)   # release: nothing on the panel before Phosh
     put("etc/ssh/sshd_config.d/bitra.conf", SSHD_CONF)
     put("etc/init.d/bitra-net", BITRA_NET, 0o755)
     put("etc/init.d/bitra-growfs", BITRA_GROWFS, 0o755)
@@ -334,7 +336,10 @@ def inner(a):
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
-    chroot("/usr/sbin/chpasswd", inp=b"root:bitra\n")
+    if RELEASE:
+        chroot("/usr/bin/passwd", "-l", "root")
+    else:
+        chroot("/usr/sbin/chpasswd", inp=b"root:bitra\n")
     # graphical session user (dev password), groups for seatd/DRM/input
     chroot("/usr/sbin/addgroup", "-S", "render")
     chroot("/usr/sbin/adduser", "-D", "-s", "/bin/sh", "bitra")
@@ -429,7 +434,10 @@ def main():
     ap.add_argument("--branch", default="v3.24")
     ap.add_argument("--size-mb", type=int, default=1280)
     ap.add_argument("--out", default=str(ROOT / "releases/alpine-rootfs.ext4"))
+    ap.add_argument("--release", action="store_true", help="production profile: no login prompt on the panel (no getty), root password locked")
     a = ap.parse_args()
+    global RELEASE
+    RELEASE = a.release
     if os.geteuid() != 0:
         os.execvp("unshare", ["unshare", "--map-root-user", "--map-auto", sys.executable, *sys.argv])
     inner(a)

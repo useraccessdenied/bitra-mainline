@@ -6,7 +6,7 @@ Reuses scripts/build_debug_initramfs.py (busybox + NCM gadget initramfs, header 
     trees it can merge the vendor dtbo into; the kernel swaps in its embedded tree (BITRA_DTB_SHIM).
   * the heartbeat is quiet so the on-screen early console (earlycon=efifb) is not scrolled away.
 
-  python3 scripts/build_mainline_boot.py NAME [--cmdline-extra STR]
+  python3 scripts/build_mainline_boot.py NAME [--release | --cmdline-extra STR]
 Output: releases/NAME.img (gitignored)
 Always boot via `ssh mac to-fastboot` (a manually entered fastboot makes ABL refuse images: 'Load Error').
 """
@@ -81,12 +81,12 @@ b.INIT = b.INIT.replace('UDC=$(ls /sys/class/udc | head -n1)',
     'for l in $(cat /sys/kernel/debug/devices_deferred 2>/dev/null | tr "\\t" "~" | head -12); do log "deferred: $l"; done\n'
     'UDC=$(ls /sys/class/udc | head -n1)', 1)
 # the agent speaks telnet (IAC) on :23, like the Droidian initrd's busybox telnetd; plain `nc -e` closes on it
-b.INIT = b.INIT.replace("nc -ll -p 23 -e /bin/sh &", "telnetd -b 0.0.0.0:23 -l /bin/sh")
+b.INIT = b.INIT.replace("nc -ll -p 23 -e /bin/sh &", "telnetd -b 192.168.2.15:23 -l /bin/sh")
 # DHCP for the Mac side (no sudo needed there): same pool as the Droidian initrd (192.168.2.20-30)
-b.INIT = b.INIT.replace('  telnetd -b 0.0.0.0:23 -l /bin/sh',
+b.INIT = b.INIT.replace('  telnetd -b 192.168.2.15:23 -l /bin/sh',
     "  printf 'start 192.168.2.20\\nend 192.168.2.30\\ninterface %s\\nlease_file /tmp/udhcpd.leases\\noption subnet 255.255.255.0\\n' \"$IF\" > /tmp/udhcpd.conf\n"
     '  udhcpd /tmp/udhcpd.conf &\n'
-    '  telnetd -b 0.0.0.0:23 -l /bin/sh',1)
+    '  telnetd -b 192.168.2.15:23 -l /bin/sh',1)
 # the agent's shell wrapper does `exec bash ... || exec sh`; a failed exec kills busybox ash, so give it a bash,
 # and its file transfer uses /usr/local/sbin/busybox-bitra nc
 b.INIT = b.INIT.replace('mount -t devtmpfs devtmpfs /dev 2>/dev/null\n',
@@ -210,6 +210,12 @@ MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch
 name = sys.argv[1]
 extra = "clk_ignore_unused pd_ignore_unused panic=0 consoleblank=0 earlycon=efifb keep_bootcon fw_devlink.sync_state=strict loglevel=4"
 rest = sys.argv[2:]
+# --release: nothing on the framebuffer. No earlycon=efifb / keep_bootcon / console=tty0 (kernel and initramfs messages stay off the panel; the
+# serial console of the stock cmdline is unused), quiet + loglevel=0, no boot logo, no cursor. Same root and panic settings as the tested images.
+RELEASE_EXTRA = "bitra.root=userdata panic=0 consoleblank=0 quiet loglevel=0 logo.nologo vt.global_cursor_default=0"
+if rest[:1] == ["--release"]:
+    extra = RELEASE_EXTRA
+    rest = rest[1:]
 if rest[:1] == ["--cmdline-extra"]:
     extra = rest[1]
 sys.argv = ["x", "--kernel", str(MAIN / "Image.gz"), "--dtb", str(BITRA / "releases/droidian-kernel/dtb"),

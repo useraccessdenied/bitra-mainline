@@ -1,8 +1,8 @@
 #!/bin/sh
 # wifi-scan-test.sh [CYCLES]: switch between two saved Wi-Fi connections and scan after every switch, log failures ("Resource busy"), nl80211 events and
-# new kernel messages. Output /tmp/wifi-scan-test.log. Run detached: setsid sh /tmp/wifi-scan-test.sh 10 >/dev/null 2>&1 &
+# new kernel messages. Output /tmp/wifi-scan-test.log. Run detached: CONN_A=name1 CONN_B=name2 setsid sh /tmp/wifi-scan-test.sh 10 >/dev/null 2>&1 &
 N=${1:-10}; L=/tmp/wifi-scan-test.log; : > $L
-A=${CONN_A:-bitra-Kapil2.4G}; B=${CONN_B:-bitra-Kapil-5G}
+A=${CONN_A:?set CONN_A to a saved NetworkManager connection}; B=${CONN_B:?set CONN_B to another saved connection}
 ts() { awk '{printf "%6.1f", $1}' /proc/uptime; }
 iw event -t > /tmp/wifi-scan-events.log 2>&1 &
 EV=$!
