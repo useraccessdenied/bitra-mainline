@@ -224,22 +224,13 @@ oem_board() {
   { cat "$1"; le32 0; le32 $(( 8 + NL + NP + 8 + DL + DP )); le32 0; le32 $NL; printf %s "$NAME"; pad $NP; le32 1; le32 $DL; cat "$3"; pad $DP; } > "$2.tmp" && mv "$2.tmp" "$2"
 }
 '''
-RELEASE_INIT = r'''#!/bin/busybox sh
-export PATH=/bin:/sbin:/usr/bin:/usr/sbin
-/bin/busybox --install -s /bin 2>/dev/null
-mount -t proc proc /proc
-mount -t sysfs sysfs /sys
-mount -t devtmpfs devtmpfs /dev
-mkdir -p /pstore /config /newroot
-mount -t pstore pstore /pstore 2>/dev/null
-# proprietary vendor files (GPU ZAP shader, DSP firmware, sensor configs) live in the super partition (super.img, docs/38): mount it read-only and
+PREROOT = r'''# proprietary vendor files (GPU ZAP shader, DSP firmware, sensor configs) live in the super partition (super.img, docs/38): mount it read-only and
 # put its firmware where the kernel looks, before the GPU asks for the ZAP; the new root gets /vendor moved in and binds the rest (bitra-vendor)
 mkdir -p /vendor /lib/firmware/qcom/sm8250/realme/bitra
 ( i=0; while [ $i -lt 90 ]; do
     for d in /sys/class/block/sd*; do grep -qx "PARTNAME=super" $d/uevent 2>/dev/null && SUP=/dev/${d##*/}; done
     [ -n "$SUP" ] && mount -t ext4 -o ro "$SUP" /vendor 2>/dev/null && { mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra; break; }
     i=$((i+1)); sleep 1; done ) &
-( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &
 @OEM_BOARD_FN@
 # per-unit Wi-Fi board data from the phone's own persist partition (read-only): build an OEM board-2.bin in RAM, make ath11k reload it
 mkdir -p /mnt/persist
@@ -253,6 +244,17 @@ mkdir -p /mnt/persist
     for d in /sys/bus/pci/drivers/ath11k_pci/0000:*; do [ -e "$d" ] && { n=${d##*/}; echo $n > /sys/bus/pci/drivers/ath11k_pci/unbind; echo $n > /sys/bus/pci/drivers/ath11k_pci/bind; }; done
   fi
   umount /mnt/persist 2>/dev/null ) &
+'''
+RELEASE_INIT = r'''#!/bin/busybox sh
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+/bin/busybox --install -s /bin 2>/dev/null
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /pstore /config /newroot
+mount -t pstore pstore /pstore 2>/dev/null
+( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &
+@PREROOT@
 # boot logo as soon as the panel's framebuffer exists (the msm driver probes after ~10-25 s)
 ( i=0; while [ ! -e /dev/fb0 ] && [ $i -lt 120 ]; do sleep 1; i=$((i+1)); done; [ -e /dev/fb0 ] && gunzip -c /logo.raw.gz > /dev/fb0 ) &
 CMDROOT=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^bitra.root=//p')
@@ -273,12 +275,27 @@ while [ $n -lt 120 ]; do
 done
 echo b > /proc/sysrq-trigger
 '''
+if sys.argv[2:3] == ["--test"]:
+    # Test image = the release boot (same super/persist/Wi-Fi board handling, no per-unit firmware inside) PLUS the USB-NCM shell and telnet for bitra-agent.
+    _wd = "while :; do echo . >&3; sleep 4; done ) &  # fd held open: no per-pet close warning\n"
+    assert _wd in b.INIT
+    b.INIT = b.INIT.replace(_wd, _wd + PREROOT.replace('@OEM_BOARD_FN@', OEM_BOARD_FN), 1)
+    _mv = 'for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done'
+    assert _mv in b.INIT
+    b.INIT = b.INIT.replace(_mv, 'mkdir -p /newroot/vendor; mount --move /vendor /newroot/vendor 2>/dev/null\n      [ -s /tmp/oem-board-2.bin ] && cp /tmp/oem-board-2.bin /newroot/lib/firmware/ath11k/QCA6390/hw2.0/board-2.bin\n      ' + _mv, 1)
+    _orig_cpio_t = b.cpio_newc
+    def _cpio_test(entries):
+        import stat as _st
+        X = _st.S_IFREG | 0o755
+        # same test tools as the dev initramfs, but firmware without the ZAP shader / per-unit board data
+        return _orig_cpio(entries + firmware_entries(True) + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-switchroot", X, BITRA_SWITCHROOT, None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
+    b.cpio_newc = _cpio_test
 if sys.argv[2:3] == ["--release"]:
     import importlib.util
     _s = importlib.util.spec_from_file_location("mkbootlogo", ROOT / "tools/make-boot-logo.py")
     _m = importlib.util.module_from_spec(_s); _s.loader.exec_module(_m)
     _logo = _m.make(os.environ.get("BOOT_LOGO_PNG"))
-    b.INIT = RELEASE_INIT.replace('@OEM_BOARD_FN@', OEM_BOARD_FN)
+    b.INIT = RELEASE_INIT.replace('@PREROOT@', PREROOT).replace('@OEM_BOARD_FN@', OEM_BOARD_FN)
     def _cpio_release(entries):
         import stat as _st
         return _orig_cpio(entries + firmware_entries(True) + [("logo.raw.gz", _st.S_IFREG | 0o644, _logo, None)])
@@ -290,7 +307,7 @@ rest = sys.argv[2:]
 # --release: nothing on the framebuffer. No earlycon=efifb / keep_bootcon / console=tty0 (kernel and initramfs messages stay off the panel; the
 # serial console of the stock cmdline is unused), quiet + loglevel=0, no boot logo, no cursor. Same root and panic settings as the tested images.
 RELEASE_EXTRA = "bitra.root=userdata panic=0 consoleblank=0 quiet loglevel=0 logo.nologo vt.global_cursor_default=0"
-if rest[:1] == ["--release"]:
+if rest[:1] in (["--release"], ["--test"]):
     extra = RELEASE_EXTRA
     rest = rest[1:]
 if rest[:1] == ["--cmdline-extra"]:
