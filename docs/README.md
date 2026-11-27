@@ -26,6 +26,7 @@ Numbering continues the `bitra` workspace docs (00–17 cover LineageOS and Droi
 | [35-wifi.md](35-wifi.md) | Wi-Fi: OEM board data (bdwlan.elf in board-2.bin, DT variant), the MAC address service |
 | [36-bluetooth.md](36-bluetooth.md) | Bluetooth: bluetoothd at boot, per-phone address, name and device class |
 | [37-systemd-migration.md](37-systemd-migration.md) | Handoff for moving to a systemd distribution: candidates, what stays, workarounds to translate |
+| [38-production-images.md](38-production-images.md) | Release (silent) boot image, production rootfs, the clean flash of 2026-11-27, what is left for production |
 
 Conventions: results are dated; "verified" means seen on the phone; every kernel change is committed in the fork (branch `bitra`) and exported to `patches/series/`
 (`python3 scripts/export_patches.py`); upstream-worthy fixes get a row in docs/24; hardware changes update docs/27 in the same commit.

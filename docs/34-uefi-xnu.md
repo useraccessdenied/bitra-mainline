@@ -283,3 +283,5 @@ only the I2C pins, and GPIO 38 (reset) only if the chip does not answer, every r
 - The three `smc` calls inside Mu's TLMMDxe are TZ feature probes (SCM info service, IS_CALL_AVAILABLE), not an unlock.
 - Next: UI speed (5-19 frames a second; apps render on the CPU): the cpufreq driver (EPSS 0x18591000, three groups: the SM8250 layout) enabled for bitra, image BC.
 - **cpufreq result (BC, 2026-11-26):** raw EPSS writes (0x18591000) and the RPMh BCM DDR vote (16383 on MC0/SH0) are allowed and do not reset the phone. Groups: cores 0-3 (A55) row 13 -> 16 = 1804 MHz, cores 4-6 row 0 -> 17 = 2419 MHz, core 7 row 0 -> 20 = 3187 MHz. A loop on core 0 ran 379 -> 451 (+19%). UI still 10-20 fps while scrolling (driver cost 2-6 ms/frame, so the time is in the CPU-side software rendering by SpringBoard/backboardd, no GPU); touch 3346 reports, 0 bad. No thermal guard yet.
+- **2026-11-27: the `darwin` partition (sda12) was removed** at the owner's request (its 64 GiB went to `userdata`, docs/38). HakiOS/iOS boots need it recreated and the iOS volume rebuilt from the restore ipsw (`ref/`); the old partition table is in `android/backups/lun0-gpt-20261127/`.
+
