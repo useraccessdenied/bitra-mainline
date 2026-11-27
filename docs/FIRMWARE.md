@@ -39,3 +39,7 @@ The DSP images are relocatable; the device tree's reserved regions must be at le
 
 ## Sharing
 Do not put the extracted files in a public repository. Share the tool, the manifest and the extraction recipe instead.
+
+## Generated: Wi-Fi board data
+`ath11k/QCA6390/hw2.0/board-2.bin` is generated for this phone (the generic linux-firmware file plus the OEM `persist/bdwlan.elf` as the entry `...variant=realme_GT_Neo_2`): `python3 tools/make-ath11k-board.py --bdwlan bdwlan.elf --board-2 <linux-firmware board-2.bin> -o third_party/firmware/ath11k/QCA6390/hw2.0/board-2.bin` (docs/35). It contains the vendor's data: do not publish it. Its sha256 differs from the manifest's linux-firmware entry by design.
+

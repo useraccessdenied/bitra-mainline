@@ -1,0 +1,24 @@
+#!/sbin/openrc-run
+# With the phone's own Wi-Fi board data (bdwlan.elf in board-2.bin, docs/35) the QCA6390 firmware reports the MAC 00:00:00:00:00:00 and expects the host to supply
+# it (stock Android's "use-nv-mac"). Give wlan0 a stable locally administered address derived from the SoC serial, before NetworkManager starts.
+description="Set a stable locally administered MAC on wlan0 (derived from the SoC serial)"
+
+depend() {
+        need udev
+        before networkmanager
+        after hwdrivers udev-trigger
+}
+
+start() {
+        ebegin "Setting the wlan0 MAC address"
+        n=0
+        while [ ! -e /sys/class/net/wlan0 ] && [ $n -lt 30 ]; do sleep 1; n=$((n+1)); done
+        [ -e /sys/class/net/wlan0 ] || { eend 1 "wlan0 did not appear"; return 1; }
+        serial=$(cat /sys/devices/soc0/serial_number 2>/dev/null)
+        [ -n "$serial" ] || serial=$(cat /sys/class/block/sda/device/serial 2>/dev/null)
+        h=$(printf 'bitra-wlan:%s' "$serial" | sha256sum | cut -c1-10)
+        mac=$(echo "$h" | sed 's/\(..\)\(..\)\(..\)\(..\)\(..\)/02:\1:\2:\3:\4:\5/')
+        ip link set wlan0 down 2>/dev/null
+        ip link set wlan0 address "$mac"
+        eend $? "could not set $mac"
+}
