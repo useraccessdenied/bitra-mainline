@@ -366,9 +366,18 @@ def inner(a):
     # sensor configuration served to the SLPI by hexagonrpcd (docs/32): vendor + odm JSON configs and sns_reg.conf from the stock ROM extracts
     qroot = "usr/share/qcom/sm8250/realme/bitra"
     stock = BITRA / "firmware/stock-a13"
+    # The SSC loads every config it is given, one after another (~0.2 s each, 4-8 s stalls on absent chips): serving only what this phone has cuts the
+    # sensor start from ~110 s to ~50 s (docs/32, tools/sensor-prune.sh has the same list). Dropped: other platforms (sxr2130_*), chips that are not in the stock
+    # bitra device tree (other IMUs, SAR, barometer, heart rate, hall, wigig, other ALS/prox chips), the rear colour sensor and the AKM magnetometer (the MMC5603 is fitted).
+    import re as _re
+    drop = _re.compile(r"^(sxr2130_.*|wigig_sensing_0|pah_813x_0_reg|kona_bu52053nvx_0|bmi160|kona_qrd_bmi160|bmi26x_0|kona_qrd_bmi26x_0|kona_qrd_lsm6dsm|kona_qrd_lsm6dso|"
+                       r"kona_sx932x_0|sx932x_0|kona_qrd_sx933x_0|kona_qrd_lps22hh_0|lps22hh_0|kona_qrd_tmd2725_0|stk3x5x_0|tcs3701|sns_heart_rate|sns_wrist_pedo|"
+                       r"kona_qrd_cct|kona_qrd_cct_rear|kona_qrd_tcs3408_rear|tcs3408|kona_hdk_ak991x_0|kona_qrd_ak991x_0)\.json$")
     for src, sub in ((stock / "v-extract/vendor/etc/sensors/config", "sensors/config"), (stock / "o-extract/odm/etc/sensor/config", "sensors/config")):
         if src.is_dir():
             for f in sorted(src.iterdir()):
+                if drop.match(f.name):
+                    continue
                 put(f"{qroot}/{sub}/{f.name}", f.read_bytes())
     if (stock / "v-extract/vendor/etc/sensors/sns_reg_config").exists():
         put(f"{qroot}/sensors/sns_reg.conf", (stock / "v-extract/vendor/etc/sensors/sns_reg_config").read_bytes())
