@@ -150,14 +150,14 @@ start() {
 
 BITRA_VENDOR = """#!/sbin/openrc-run
 description="bind the proprietary vendor files from the super partition (mounted read-only by the initramfs at /vendor, docs/38) to where the kernel and hexagonrpcd look"
-depend() { need root; before udev hexagonrpcd-sdsp bitra-sensors; }
+depend() { need root; before udev hexagonrpcd-sdsp bitra-sensors; }   # runs in sysinit: udev loads the DSP drivers there and they need the firmware at once
 start() {
     q=/usr/share/qcom/sm8250/realme/bitra
     if [ ! -d /vendor/firmware ]; then
         mkdir -p /vendor
         mount -t ext4 -o ro /dev/disk/by-partlabel/super /vendor 2>/dev/null || { eerror "vendor image (super partition) not found: flash super.img"; return 0; }
     fi
-    mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra
+    mountpoint -q /lib/firmware/qcom/sm8250/realme/bitra || mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra
     mount --bind /vendor/sensors/config $q/sensors/config
     mount --bind /vendor/sensors/sns_reg_config $q/sensors/sns_reg.conf
     # the DSPs probe long before this mount and stay offline when their firmware is missing: start them now (ADSP: audio, SLPI: sensors)
@@ -409,7 +409,7 @@ def inner(a):
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("elogind", "default"), ("polkit", "default"), ("tinydm", "default"), ("networkmanager", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
-                     ("bitra-growfs", "boot"), ("bitra-vendor", "boot"), ("bitra-persist", "boot"), ("bitra-wifi-board", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
+                     ("bitra-growfs", "boot"), ("bitra-vendor", "sysinit"), ("bitra-persist", "boot"), ("bitra-wifi-board", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if RELEASE and svc in TEST_ONLY_SERVICES:
             continue   # release: no USB-NCM link, telnet shell, DHCP server or diagnostics on the panel; test images keep them

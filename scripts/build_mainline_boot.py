@@ -266,6 +266,8 @@ while [ $n -lt 120 ]; do
     P=/newroot/var/lib/pstore/early-$(cut -d. -f1 /proc/uptime); mkdir -p $P; cp /pstore/* $P/ 2>/dev/null
     mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore /newroot/run /newroot/vendor
     mount --move /vendor /newroot/vendor 2>/dev/null
+    # the firmware bind must survive the switch: the DSP drivers (modules loaded by udev in sysinit) probe ~0.5 s after the root is up
+    mkdir -p /newroot/lib/firmware/qcom/sm8250/realme/bitra; mount --move /lib/firmware/qcom/sm8250/realme/bitra /newroot/lib/firmware/qcom/sm8250/realme/bitra 2>/dev/null
     [ -s /tmp/oem-board-2.bin ] && cp /tmp/oem-board-2.bin /newroot/lib/firmware/ath11k/QCA6390/hw2.0/board-2.bin
     mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /newroot/run
     for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done
