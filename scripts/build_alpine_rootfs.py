@@ -160,10 +160,35 @@ start() {
     mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra
     mount --bind /vendor/sensors/config $q/sensors/config
     mount --bind /vendor/sensors/sns_reg_config $q/sensors/sns_reg.conf
+    # the DSPs probe long before this mount and stay offline when their firmware is missing: start them now (ADSP: audio, SLPI: sensors)
+    for r in /sys/class/remoteproc/remoteproc*; do
+        [ "$(cat $r/state 2>/dev/null)" = offline ] && echo start > $r/state 2>/dev/null
+    done
     return 0
 }
 stop() {
     for m in /usr/share/qcom/sm8250/realme/bitra/sensors/sns_reg.conf /usr/share/qcom/sm8250/realme/bitra/sensors/config /lib/firmware/qcom/sm8250/realme/bitra; do umount $m 2>/dev/null; done
+    return 0
+}
+"""
+
+BITRA_WIFI_BOARD = """#!/sbin/openrc-run
+description="make ath11k load the per-unit OEM board data the initramfs built from the persist partition (rebind the PCI device, retrying)"
+depend() { need root; before bitra-wifi-mac networkmanager; }
+start() {
+    [ "$(stat -c %s /lib/firmware/ath11k/QCA6390/hw2.0/board-2.bin 2>/dev/null)" -gt 250000 ] || return 0   # generic file only: nothing to apply
+    [ -e /run/bitra-wifi-board.done ] && return 0
+    d=/sys/bus/pci/drivers/ath11k_pci
+    for dev in $d/0000:*; do
+        [ -e "$dev" ] || continue
+        n=${dev##*/}
+        echo $n > $d/unbind
+        i=0
+        while [ ! -e $d/$n ] && [ $i -lt 6 ]; do sleep 2; echo $n > $d/bind 2>/dev/null; i=$((i+1)); done
+        [ -e $d/$n ] || ewarn "ath11k did not come back after the rebind"
+    done
+    i=0; while [ ! -e /sys/class/net/wlan0 ] && [ $i -lt 15 ]; do sleep 1; i=$((i+1)); done
+    touch /run/bitra-wifi-board.done
     return 0
 }
 """
@@ -341,6 +366,7 @@ def inner(a):
     if RELEASE:
         put("etc/init.d/bitra-vendor", BITRA_VENDOR, 0o755)
         put("etc/init.d/bitra-persist", BITRA_PERSIST, 0o755)
+        put("etc/init.d/bitra-wifi-board", BITRA_WIFI_BOARD, 0o755)
     put("etc/init.d/bitra-pstore", BITRA_PSTORE, 0o755)
     put("etc/init.d/bitra-time", BITRA_TIME, 0o755)
     put("etc/bitra-build-time", str(int(__import__("time").time())) + "\n")
@@ -383,7 +409,7 @@ def inner(a):
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("elogind", "default"), ("polkit", "default"), ("tinydm", "default"), ("networkmanager", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
-                     ("bitra-growfs", "boot"), ("bitra-vendor", "boot"), ("bitra-persist", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
+                     ("bitra-growfs", "boot"), ("bitra-vendor", "boot"), ("bitra-persist", "boot"), ("bitra-wifi-board", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if RELEASE and svc in TEST_ONLY_SERVICES:
             continue   # release: no USB-NCM link, telnet shell, DHCP server or diagnostics on the panel; test images keep them

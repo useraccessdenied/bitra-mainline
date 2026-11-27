@@ -232,7 +232,7 @@ mkdir -p /vendor /lib/firmware/qcom/sm8250/realme/bitra
     [ -n "$SUP" ] && mount -t ext4 -o ro "$SUP" /vendor 2>/dev/null && { mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra; break; }
     i=$((i+1)); sleep 1; done ) &
 @OEM_BOARD_FN@
-# per-unit Wi-Fi board data from the phone's own persist partition (read-only): build an OEM board-2.bin in RAM, make ath11k reload it
+# per-unit Wi-Fi board data from the phone's own persist partition (read-only): build an OEM board-2.bin in RAM, the rootfs applies it
 mkdir -p /mnt/persist
 ( i=0; while [ $i -lt 90 ]; do
     for d in /sys/class/block/sd*; do grep -qx "PARTNAME=persist" $d/uevent 2>/dev/null && PER=/dev/${d##*/}; done
@@ -241,7 +241,7 @@ mkdir -p /mnt/persist
   B=/lib/firmware/ath11k/QCA6390/hw2.0/board-2.bin
   if oem_board $B /tmp/oem-board-2.bin /mnt/persist/bdwlan.elf; then
     cp /tmp/oem-board-2.bin $B
-    for d in /sys/bus/pci/drivers/ath11k_pci/0000:*; do [ -e "$d" ] && { n=${d##*/}; echo $n > /sys/bus/pci/drivers/ath11k_pci/unbind; echo $n > /sys/bus/pci/drivers/ath11k_pci/bind; }; done
+    # ath11k already probed with the generic board data; the rootfs service bitra-wifi-board rebinds it (a rebind here left the chip unbound)
   fi
   umount /mnt/persist 2>/dev/null ) &
 '''
