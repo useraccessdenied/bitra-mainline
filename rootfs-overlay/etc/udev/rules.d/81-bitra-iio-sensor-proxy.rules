@@ -5,4 +5,7 @@ SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-acc
 # Accelerometer mount matrix (docs/32). Raw SSC readings: flat screen-up (0.4, 0.0, -9.8), portrait upright (-0.5, -9.8, -0.8), landscape with the top to
 # the left (9.8, 0.0, -1.0). Z is inverted (flat must read face-up); the first guess diag(1,-1,-1) gave a UI rotated 180 degrees in portrait and landscape on
 # the phone, so X and Y are flipped relative to that: diag(-1, 1, -1).
-SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp*", ENV{ACCEL_MOUNT_MATRIX}="-1, 0, 0; 0, 1, 0; 0, 0, -1"
+# 2026-11-27: once the SLPI gets the oplus sensor inventory (SMEM item 130, docs/32) it applies the stock `sensor-direction = 3` to the accelerometer itself, which
+# turns the raw values by 180 degrees about X (Y and Z change sign; X is unchanged: landscape stayed right, portrait went upside down, a flat phone now reads Z +9.7).
+# New matrix = old matrix x diag(1,-1,-1) = diag(-1, -1, 1).
+SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp*", ENV{ACCEL_MOUNT_MATRIX}="-1, 0, 0; 0, -1, 0; 0, 0, 1"
