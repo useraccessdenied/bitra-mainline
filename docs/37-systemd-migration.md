@@ -2,6 +2,11 @@
 
 Decision (owner): the Alpine/OpenRC userland needs too many workarounds; the plan is to move to a systemd distribution **after** the important hardware works. This page is the handoff for whoever (agent or person) does it. Nothing here has been tried yet.
 
+## Owner's choice (2026-11-27): two variants, to be built later
+1. **Mobian (Debian) with Phosh**, the recommended one above.
+2. **Fedora with Plasma Mobile** (`@plasma-mobile`/KDE Plasma Mobile packages, SDDM or its autologin, kwin_wayland, PipeWire; Plasma Mobile brings its own session, KDE Connect/Plasma Settings and its own Bluetooth/Wi-Fi/sensor integration, so the Phosh-specific workarounds below do not apply there: check how it gets orientation and sensors from `iio-sensor-proxy`/`libssc`, and how its Bluetooth and hostname settings work with systemd-hostnamed).
+Both share the same boot image, kernel, firmware, udev rules and the delegated `iio-sensor-proxy` fix; they differ only in the rootfs recipe (`mkosi --distribution=debian` and `--distribution=fedora`) and the session/audio layer. Keep the rootfs recipes side by side in the repo and share one overlay of the common pieces.
+
 ## What does not change
 The kernel (`linux-mainline-bitra`, branch `bitra`, `7.2.0-bitra`, DTB embedded through `CONFIG_BITRA_DTB_SHIM`), the boot image builder (`scripts/build_mainline_boot.py`, initramfs with the USB-NCM gadget and the `bitra.root=` switch_root hook, so the distro only has to provide a root filesystem for the `userdata` partition), the firmware tooling (`tools/bitra-firmware.py`, `firmware/manifest.json`, `tools/make-ath11k-board.py`, docs/FIRMWARE.md, docs/35), the SMEM sensor inventory driver (built into the kernel), the udev rules, the flashing/test flow with `bitra-agent`, and the safety rules in `AGENTS.md`.
 
