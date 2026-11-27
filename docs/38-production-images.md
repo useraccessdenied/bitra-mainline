@@ -43,7 +43,7 @@ Fastboot on this bootloader hangs after a `userdata` flash: `getvar` times out a
 3. `fastboot erase userdata`
 4. `fastboot flash userdata userdata.img`
 5. `fastboot reboot`
-`userdata` is always the last write, and it is erased before it is flashed. (The 0.1-test flash did `super`, `userdata`, then `boot`, and had to be recovered by hand.) The agent's `flash` command needs an `erase` step and a flash-order check for this.
+`userdata` is always the last write, and it is erased before it is flashed. Reason for the erase (my diagnosis of the 0.1-test no-Phosh boot, to be confirmed): `img2simg` turns all-zero blocks into DONT_CARE chunks, and `mke2fs -E lazy_itable_init=1` leaves the inode tables zero, so a sparse flash over an un-erased partition keeps the OLD partition's blocks there and the new ext4 reads garbage inodes. (The 0.1-test flash did `super`, `userdata`, then `boot`, and had to be recovered by hand.) The agent's `flash` command needs an `erase` step and a flash-order check for this.
 
 ## Release build, first implementation (this session)
 - `scripts/build_mainline_boot.py NAME --release` now uses a separate minimal initramfs (`RELEASE_INIT`): watchdog petting, logo, wait for `bitra.root`, mount, keep pstore, `switch_root`, reboot after 120 s. It carries only busybox, firmware and the logo (no gadget, telnetd/udhcpd, `bitra-switchroot`, reboot helper, DRM/evtest/failnth tools, soak script, wpa_supplicant/iw/bluez tools). Built as `releases/mainline-boot-11.img`.

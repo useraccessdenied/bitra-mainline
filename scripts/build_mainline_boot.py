@@ -211,6 +211,19 @@ b.cpio_newc = _cpio
 # Release initramfs (--release): no USB gadget, no telnet/DHCP, no shell, no test tools. It pets the watchdog, draws the boot logo on the panel,
 # waits for the root partition (bitra.root=NAME), mounts it, keeps the previous boot's pstore, and switch_roots. If the root never appears it
 # reboots after 120 s (nothing to log in to). Recovery is the bootloader (fastboot with the key combination).
+# Wi-Fi OEM board data: bdwlan.elf is per unit (TX power / calibration limits) and lives in the phone's own persist partition. Append it to the generic
+# linux-firmware board-2.bin as one more board entry (same bytes as tools/make-ath11k-board.py, which is the tested reference): TLV type 0 =
+# [name ie (type 0) + data ie (type 1)], u32 little endian type, u32 length, payload padded to 4 bytes. usage: oem_board GENERIC OUT BDWLAN
+OEM_BOARD_FN = r'''
+oem_board() {
+  [ -s "$3" ] && [ "$(head -c 4 "$3" | tail -c 3)" = "ELF" ] || return 1
+  NAME="bus=pci,qmi-chip-id=0,qmi-board-id=255,variant=realme_GT_Neo_2"
+  NL=${#NAME}; DL=$(wc -c < "$3"); NP=$(( (4 - NL % 4) % 4 )); DP=$(( (4 - DL % 4) % 4 ))
+  le32() { printf "$(printf '\\%03o\\%03o\\%03o\\%03o' $(( $1 & 255 )) $(( ($1 >> 8) & 255 )) $(( ($1 >> 16) & 255 )) $(( ($1 >> 24) & 255 )))"; }
+  pad() { [ "$1" -gt 0 ] && head -c "$1" /dev/zero; return 0; }
+  { cat "$1"; le32 0; le32 $(( 8 + NL + NP + 8 + DL + DP )); le32 0; le32 $NL; printf %s "$NAME"; pad $NP; le32 1; le32 $DL; cat "$3"; pad $DP; } > "$2.tmp" && mv "$2.tmp" "$2"
+}
+'''
 RELEASE_INIT = r'''#!/bin/busybox sh
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 /bin/busybox --install -s /bin 2>/dev/null
@@ -227,6 +240,19 @@ mkdir -p /vendor /lib/firmware/qcom/sm8250/realme/bitra
     [ -n "$SUP" ] && mount -t ext4 -o ro "$SUP" /vendor 2>/dev/null && { mount --bind /vendor/firmware/qcom/sm8250/realme/bitra /lib/firmware/qcom/sm8250/realme/bitra; break; }
     i=$((i+1)); sleep 1; done ) &
 ( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &
+@OEM_BOARD_FN@
+# per-unit Wi-Fi board data from the phone's own persist partition (read-only): build an OEM board-2.bin in RAM, make ath11k reload it
+mkdir -p /mnt/persist
+( i=0; while [ $i -lt 90 ]; do
+    for d in /sys/class/block/sd*; do grep -qx "PARTNAME=persist" $d/uevent 2>/dev/null && PER=/dev/${d##*/}; done
+    [ -n "$PER" ] && mount -t ext4 -o ro,noload "$PER" /mnt/persist 2>/dev/null && break
+    i=$((i+1)); sleep 1; done
+  B=/lib/firmware/ath11k/QCA6390/hw2.0/board-2.bin
+  if oem_board $B /tmp/oem-board-2.bin /mnt/persist/bdwlan.elf; then
+    cp /tmp/oem-board-2.bin $B
+    for d in /sys/bus/pci/drivers/ath11k_pci/0000:*; do [ -e "$d" ] && { n=${d##*/}; echo $n > /sys/bus/pci/drivers/ath11k_pci/unbind; echo $n > /sys/bus/pci/drivers/ath11k_pci/bind; }; done
+  fi
+  umount /mnt/persist 2>/dev/null ) &
 # boot logo as soon as the panel's framebuffer exists (the msm driver probes after ~10-25 s)
 ( i=0; while [ ! -e /dev/fb0 ] && [ $i -lt 120 ]; do sleep 1; i=$((i+1)); done; [ -e /dev/fb0 ] && gunzip -c /logo.raw.gz > /dev/fb0 ) &
 CMDROOT=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^bitra.root=//p')
@@ -238,6 +264,7 @@ while [ $n -lt 120 ]; do
     P=/newroot/var/lib/pstore/early-$(cut -d. -f1 /proc/uptime); mkdir -p $P; cp /pstore/* $P/ 2>/dev/null
     mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore /newroot/run /newroot/vendor
     mount --move /vendor /newroot/vendor 2>/dev/null
+    [ -s /tmp/oem-board-2.bin ] && cp /tmp/oem-board-2.bin /newroot/lib/firmware/ath11k/QCA6390/hw2.0/board-2.bin
     mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /newroot/run
     for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done
     exec switch_root /newroot /sbin/init
@@ -251,7 +278,7 @@ if sys.argv[2:3] == ["--release"]:
     _s = importlib.util.spec_from_file_location("mkbootlogo", ROOT / "tools/make-boot-logo.py")
     _m = importlib.util.module_from_spec(_s); _s.loader.exec_module(_m)
     _logo = _m.make(os.environ.get("BOOT_LOGO_PNG"))
-    b.INIT = RELEASE_INIT
+    b.INIT = RELEASE_INIT.replace('@OEM_BOARD_FN@', OEM_BOARD_FN)
     def _cpio_release(entries):
         import stat as _st
         return _orig_cpio(entries + firmware_entries(True) + [("logo.raw.gz", _st.S_IFREG | 0o644, _logo, None)])
