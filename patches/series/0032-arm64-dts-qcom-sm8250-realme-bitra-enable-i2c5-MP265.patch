@@ -1,7 +1,7 @@
 From 328fcbd3be9eef469465bc83eee458fbb745943a Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 22:09:47 +0530
-Subject: [PATCH 32/32] arm64: dts: qcom: sm8250-realme-bitra: enable i2c5
+Subject: [PATCH 32/33] arm64: dts: qcom: sm8250-realme-bitra: enable i2c5
  (MP2650 charger bus, read-only access)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

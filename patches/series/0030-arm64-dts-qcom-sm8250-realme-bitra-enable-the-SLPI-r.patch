@@ -1,7 +1,7 @@
 From da53c710f8dc063944f14c4d1af46d10124ddb1b Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 20:40:03 +0530
-Subject: [PATCH 30/32] arm64: dts: qcom: sm8250-realme-bitra: enable the SLPI
+Subject: [PATCH 30/33] arm64: dts: qcom: sm8250-realme-bitra: enable the SLPI
  remoteproc
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

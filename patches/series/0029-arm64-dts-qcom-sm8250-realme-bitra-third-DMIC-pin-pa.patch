@@ -1,7 +1,7 @@
 From f04411f423320487c59d583a9aef9255276ad848 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 20:10:52 +0530
-Subject: [PATCH 29/32] arm64: dts: qcom: sm8250-realme-bitra: third DMIC pin
+Subject: [PATCH 29/33] arm64: dts: qcom: sm8250-realme-bitra: third DMIC pin
  pair (gpio12/13) and stock VA DMIC bias routes
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

@@ -1,7 +1,7 @@
 From c96f946a1d5c785582f3dcc257aaf667a95e9103 Mon Sep 17 00:00:00 2001
 From: useraccessdenied <useraccessdenied@users.noreply.github.com>
 Date: Sun, 22 Nov 2026 19:30:40 +0530
-Subject: [PATCH 28/32] arm64: dts: qcom: sm8250-realme-bitra: route
+Subject: [PATCH 28/33] arm64: dts: qcom: sm8250-realme-bitra: route
  AMIC1/3/4/5 to their mic biases (as stock)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
