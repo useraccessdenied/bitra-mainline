@@ -372,7 +372,7 @@ def inner(a):
             own = Path("/nonexistent")
         xz = FW_ROOT / (rel + ".xz")
         put("lib/firmware/" + rel, own.read_bytes() if own.exists() else lzma.open(xz).read() if xz.exists() else (FW_ROOT / rel).read_bytes())
-    keys = [p.read_text() for p in sorted(Path.home().glob(".ssh/*.pub"))]
+    keys = [] if RELEASE else [p.read_text() for p in sorted(Path.home().glob(".ssh/*.pub"))]   # release: the user adds their own ssh keys
     if keys:
         put("root/.ssh/authorized_keys", "".join(keys), 0o600)
         (root / "root/.ssh").chmod(0o700)
@@ -389,10 +389,8 @@ def inner(a):
             continue   # release: no USB-NCM link, telnet shell, DHCP server or diagnostics on the panel; test images keep them
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
-    if RELEASE:
-        chroot("/usr/bin/passwd", "-l", "root")
-    else:
-        chroot("/usr/sbin/chpasswd", inp=b"root:bitra\n")
+    # owner's policy (2026-11-27): root keeps the default password `bitra` in release too, so `su -` and `apk add` work; the user hardens it
+    chroot("/usr/sbin/chpasswd", inp=b"root:bitra\n")
     # graphical session user (dev password), groups for seatd/DRM/input
     chroot("/usr/sbin/addgroup", "-S", "render")
     chroot("/usr/sbin/adduser", "-D", "-s", "/bin/sh", "bitra")
@@ -493,7 +491,7 @@ def main():
     ap.add_argument("--branch", default="v3.24")
     ap.add_argument("--size-mb", type=int, default=1280)
     ap.add_argument("--out", default=str(ROOT / "releases/alpine-rootfs.ext4"))
-    ap.add_argument("--release", action="store_true", help="production profile: no login prompt on the panel (no getty), root password locked, no USB-NCM/telnet/DHCP/diag services")
+    ap.add_argument("--release", action="store_true", help="production profile: no login prompt on the panel (no getty), no baked ssh keys, no USB-NCM/telnet/DHCP/diag services")
     a = ap.parse_args()
     global RELEASE
     RELEASE = a.release

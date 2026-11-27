@@ -15,7 +15,7 @@
 
 ## The release profile
 - `scripts/build_mainline_boot.py NAME --release`: kernel command line without the framebuffer console (`bitra.root=userdata panic=0 consoleblank=0 quiet loglevel=0 logo.nologo vt.global_cursor_default=0`; the stock command line keeps `console=ttyMSM0`, which is not visible).
-- `scripts/build_alpine_rootfs.py --release`: no getty on tty1 (no login prompt on the panel), root password locked.
+- `scripts/build_alpine_rootfs.py --release`: no getty on tty1 (no login prompt on the panel), root password `bitra` (see Account policy).
 - Both builders (every profile): the dev telnet shell (root, no password, for the bitra-agent) is bound to the USB link address `192.168.2.15:23` only (it used to listen on every interface, i.e. on Wi-Fi too, also in the initramfs); sshd is key-only (`PermitRootLogin prohibit-password`, `PasswordAuthentication no`; the build host's `~/.ssh/*.pub` go to root's `authorized_keys`).
 - The flashing environment is a normal boot image built without `bitra.root` (`--cmdline-extra "panic=0 consoleblank=0 earlycon=efifb keep_bootcon console=tty0 loglevel=4"`, name `a-32`): it stays in the initramfs shell with nothing from UFS mounted.
 
@@ -35,6 +35,9 @@
 - **Wiring**: the release initramfs mounts `super` read-only at `/vendor`, binds its firmware directory over `/lib/firmware/qcom/sm8250/realme/bitra` (so the GPU finds the ZAP and the DSPs their firmware), and moves `/vendor` into the new root; the rootfs service `bitra-vendor` binds firmware, `sensors/config` and `sns_reg.conf` to where the kernel and hexagonrpcd look. If `super.img` was not flashed the service says so and the phone boots without GPU/DSP/sensors.
 - **Pipeline**: `tools/release.py VERSION --rom-zip ... --firmware-zip ...` builds `releases/VERSION/{boot.img,userdata.img,super.img,SHA256SUMS}`; users run `fastboot flash boot|userdata|super`. Same recipe for the later Mobian and Fedora Plasma Mobile `userdata.img` files; `boot.img` and `super.img` are shared. `AGENTS.md` now lists `super` as an allowed write target.
 - Open: flash test of sparse `userdata.img` and plain `super.img` with fastboot on this bootloader; the Wi-Fi OEM board data; whether the DSP/GPU firmware requests see the bind mount early enough (checked on the first release boot); empty-registry behaviour (the default template may be enough now that SMEM 130 is filled).
+
+## Account policy (owner, 2026-11-27, replaces the locked root)
+Too hardened to be useful (no `apk add`, no way in on the phone). The release now ships `root` with the default password `bitra` (and the session user `bitra` with `bitra`); `su -` works from the Phosh terminal (`gnome-console`/`foot`), no sudo (Mobian and Fedora Plasma Mobile bring their own). It is the user's job to change the passwords, create less privileged users, install tailscale (`apk add tailscale`) and add ssh keys. sshd stays key-only (`PasswordAuthentication no`), so the default password is never usable over the network; no build-host ssh keys are baked in any more. There is no separate `--test` rootfs profile: debugging happens on the complete release build (the `--test` boot image `test-boot-1` with the USB-NCM shell is still used for RAM boots).
 
 ## Flashing order (owner, 2026-11-27): userdata LAST, erase it first
 Fastboot on this bootloader hangs after a `userdata` flash: `getvar` times out and only `fastboot reboot` works (the owner then had to reboot to the bootloader by hand). So the order for the release is:
