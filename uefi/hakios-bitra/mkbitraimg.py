@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
 """Pack Mu-Silicium's bitra UEFI (with the HakiOS loader in its FV) and a HakiOS XNUP payload into a
 `fastboot boot` image: kernel = gzip(shim + FD + payload) + DTB, like Mu's own image (header v1).
-usage: mkbitraimg.py --payload payload.bin -o out.img   (env MU = Mu-Silicium tree, CLANG = clang bin dir)"""
-import argparse, gzip, os, subprocess, sys, tempfile
+usage: mkbitraimg.py --payload payload.bin -o out.img   (env BITRA_ROOT, MU = Mu-Silicium tree, CLANG = clang bin dir)"""
+import argparse, gzip, os, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MU = os.environ.get('MU', '/var/home/kapil/projects/mu-silicium-src/mu')
-CLANG = os.environ.get('CLANG', '/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin')
+def _root():
+    if os.environ.get('BITRA_ROOT'):
+        return os.environ['BITRA_ROOT']
+    for up in ('../../..',):
+        c = os.path.abspath(os.path.join(HERE, up))
+        if os.path.isdir(os.path.join(c, 'mu-silicium')):
+            return c
+    return os.path.expanduser('~/projects/bitra')
+
+
+ROOT = _root()
+MU = os.environ.get('MU', os.path.join(ROOT, 'mu-silicium', 'mu'))
+_aosp = os.path.join(ROOT, 'android/roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin')
+CLANG = os.environ.get('CLANG') or (_aosp if os.path.isdir(_aosp) else os.path.dirname(shutil.which('clang') or ''))
 FD_BASE, FD_SIZE = 0x9FC00000, 0x300000
 PAYLOAD_BASE = int(os.environ.get('PAYLOAD_BASE', '0xF4000000'), 16)   # must equal PAYLOAD_BASE of the loader (xnuloader/build.sh)
 PAYLOAD_MAX = 0x03F00000

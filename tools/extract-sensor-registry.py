@@ -7,11 +7,11 @@ written to the gitignored third_party/ tree and never committed.
 
   tools/extract-sensor-registry.py [PERSIST_IMG] [OUT_DIR]
 """
-import shutil, subprocess, sys
+import os, shutil, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BITRA = Path.home() / "projects/bitra/android"
+BITRA = Path(os.environ.get("BITRA_REPO", ROOT.parent / "android"))
 img = Path(sys.argv[1]) if len(sys.argv) > 1 else BITRA / "backups/20261116-213951/parts/persist.img"
 out = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "third_party/sensors/registry"
 if not img.exists():

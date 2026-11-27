@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
-W=/var/home/kapil/projects/bitra/hakios/work; P=$HOME/.local
+. "$(dirname "$(readlink -f "${BASH_SOURCE:-$0}")")/env.sh" || exit 1
+W=$HAKIOS_DIR/work; P=$HOME/.local
 export PERL5LIB=$HOME/.local/lib/perl5extra
-export PATH=/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/cmake/linux-x86/bin:/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/clang/host/linux-x86/clang-r563880c/bin:$P/bin:$PATH:/var/home/kapil/projects/bitra/android/roms/lineageos/a16/prebuilts/build-tools/linux-x86/bin
+export PATH=${CMAKE_BIN:+$CMAKE_BIN:}$CLANG_DIR:$P/bin:$PATH${BUILD_TOOLS_BIN:+:$BUILD_TOOLS_BIN}
 cd $W
 if [ ! -x $P/bin/automake ]; then
   echo "=== automake"
