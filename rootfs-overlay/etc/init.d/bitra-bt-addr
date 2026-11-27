@@ -1,0 +1,30 @@
+#!/sbin/openrc-run
+# The device tree carries one fixed Bluetooth address (local-bd-address, a placeholder shared by every phone). Give the controller a stable locally administered
+# public address derived from the SoC serial instead, before bluetoothd starts (btmgmt public-addr; the kernel re-registers the controller, firmware reloads).
+description="Set a stable per-phone Bluetooth public address (derived from the SoC serial)"
+
+depend() {
+        before bluetooth
+        after hwdrivers udev-trigger
+}
+
+mgmt() { timeout 15 script -qc "btmgmt --index 0 $*" /dev/null 2>&1; }
+
+start() {
+        ebegin "Setting the Bluetooth address"
+        n=0
+        while [ ! -e /sys/class/bluetooth/hci0 ] && [ $n -lt 40 ]; do sleep 1; n=$((n+1)); done
+        [ -e /sys/class/bluetooth/hci0 ] || { eend 1 "hci0 did not appear"; return 1; }
+        serial=$(cat /sys/devices/soc0/serial_number 2>/dev/null)
+        [ -n "$serial" ] || serial=$(cat /sys/class/block/sda/device/serial 2>/dev/null)
+        h=$(printf 'bitra-bt:%s' "$serial" | sha256sum | cut -c1-10)
+        mac=$(echo "$h" | sed 's/\(..\)\(..\)\(..\)\(..\)\(..\)/02:\1:\2:\3:\4:\5/' | tr a-f A-F)
+        if mgmt info | grep -q "addr $mac"; then eend 0; return 0; fi
+        mgmt power off >/dev/null
+        mgmt public-addr "$mac" | grep -q "complete" || { eend 1 "public-addr failed"; return 1; }
+        # the controller index disappears and comes back (firmware download again)
+        n=0
+        until mgmt info | grep -q "addr $mac" || [ $n -ge 30 ]; do sleep 1; n=$((n+1)); done
+        mgmt info | grep -q "addr $mac"
+        eend $? "controller did not come back with $mac"
+}

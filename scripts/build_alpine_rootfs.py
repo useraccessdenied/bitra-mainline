@@ -23,7 +23,7 @@ OUT = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out"))
 FW_ROOT = Path(os.environ.get("FIRMWARE_DIR", "/usr/lib/firmware"))
 FW_FILES = ["regulatory.db", "regulatory.db.p7s", "ath11k/QCA6390/hw2.0/amss.bin", "ath11k/QCA6390/hw2.0/m3.bin",
             "ath11k/QCA6390/hw2.0/board-2.bin", "qca/htbtfw20.tlv", "qca/htnv20.bin"]
-PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", "e2fsprogs", "e2fsprogs-extra", "bluez", "dbus",
+PACKAGES = ["alpine-base", "busybox-extras", "openssh", "iw", "wpa_supplicant", "e2fsprogs", "e2fsprogs-extra", "bluez", "bluez-btmgmt", "dbus",
             "wireless-regdb", "nano", "htop", "util-linux", "kbd", "curl", "i2c-tools", "evtest", "python3",
             # graphical session (docs/29): sway + Mesa (freedreno/turnip) + seat/udev stack
             "sway", "seatd", "foot", "grim", "wlr-randr", "swaybg", "mesa-dri-gallium", "mesa-egl", "mesa-gles", "mesa-gbm",
@@ -330,7 +330,7 @@ def inner(a):
 
     for svc, lvl in [("devfs", "sysinit"), ("dmesg", "sysinit"), ("udev", "sysinit"), ("udev-trigger", "sysinit"), ("hwdrivers", "sysinit"), ("udev-postmount", "default"), ("elogind", "default"), ("polkit", "default"), ("tinydm", "default"), ("networkmanager", "default"),
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
-                     ("bitra-growfs", "boot"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
+                     ("bitra-growfs", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
@@ -348,7 +348,7 @@ def inner(a):
             rel = str(src.relative_to(overlay))
             put(rel, src.read_bytes(), 0o755 if rel.startswith(("usr/local/bin/", "etc/init.d/")) else 0o644)
     # services shipped in the overlay exist only now, after the runlevel loop above ran
-    for svc in ("bitra-sensors", "bitra-wifi-mac"):
+    for svc in ("bitra-sensors", "bitra-wifi-mac", "bitra-bt-addr"):
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, "default")
     chroot("/bin/chown", "-R", "1000:1000", "/home/bitra")
