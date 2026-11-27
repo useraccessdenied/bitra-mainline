@@ -9,5 +9,10 @@
 - `btmgmt` needs a terminal (it prints nothing without a pty): the service runs it through `script -qc`. Package `bluez-btmgmt` (added to the builder's package list; installed live with `apk add`).
 - The real stock address was not found (same as Wi-Fi, docs/35).
 
+## Name and class (2026-11-27)
+- Phosh's "device name" setting talks to `systemd-hostnamed` (D-Bus `org.freedesktop.hostname1`), which does not exist on this OpenRC system, so it changes nothing (the hostname stays `bitra`) and BlueZ never sees it. BlueZ takes its name from `/etc/bluetooth/main.conf` (`Name`, default `BlueZ 5.86`) and, with no device class configured, advertises class `0x000c0000` (audio service bits, no device type), so other devices showed a headset.
+- `rootfs-overlay/etc/bluetooth/main.conf` (the stock file with two lines set): `Name = realme GT Neo 2`, `Class = 0x5a020c` (BlueZ only uses the major/minor bits: Phone / Smartphone, reported as `0x000c020c`). Runtime change without a restart: `bluetoothctl system-alias NAME`. Other devices cache the old name/icon: unpair/rescan there.
+- Option if the Phosh setting should work: a small provider of `org.freedesktop.hostname1` (set-hostname + pretty hostname) that also writes the BlueZ name.
+
 ## Open
 - Pairing, A2DP/audio routing, headset profile (HFP needs a modem/ofono path), Phosh Bluetooth panel check, range, coexistence with 2.4 GHz Wi-Fi, suspend/wake.
