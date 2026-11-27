@@ -91,7 +91,7 @@ def main():
         mb = int(size * 1.25 / 1048576) + 16
         out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
         out.unlink(missing_ok=True)
-        subprocess.run(["mke2fs", "-q", "-t", "ext4", "-O", "^has_journal", "-L", "bitra-vendor", "-d", str(tree), str(out), f"{mb}M"], check=True)
+        subprocess.run(["mke2fs", "-q", "-t", "ext4", "-b", "4096", "-O", "^has_journal", "-L", "bitra-vendor", "-d", str(tree), str(out), f"{mb}M"], check=True)
         subprocess.run(["e2fsck", "-fn", str(out)], check=True, stdout=subprocess.DEVNULL)
         print(f"{out}  {mb} MiB  {len(files)} files  sha256 {sha256(out)}")
         if a.sparse:

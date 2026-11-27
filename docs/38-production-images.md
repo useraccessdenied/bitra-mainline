@@ -45,6 +45,10 @@ Fastboot on this bootloader hangs after a `userdata` flash: `getvar` times out a
 5. `fastboot reboot`
 `userdata` is always the last write, and it is erased before it is flashed. Reason for the erase (my diagnosis of the 0.1-test no-Phosh boot, to be confirmed): `img2simg` turns all-zero blocks into DONT_CARE chunks, and `mke2fs -E lazy_itable_init=1` leaves the inode tables zero, so a sparse flash over an un-erased partition keeps the OLD partition's blocks there and the new ext4 reads garbage inodes. (The 0.1-test flash did `super`, `userdata`, then `boot`, and had to be recovered by hand.) The agent's `flash` command needs an `erase` step and a flash-order check for this.
 
+## First release flash findings (2026-11-27)
+- 0.1-test booted to the logo but never showed Phosh: the first `super.img` was built with 1 KiB ext4 blocks (mke2fs default for a small image) and the kernel refuses it on UFS with 4 KiB sectors (`EXT4-fs (sda10): bad block size 1024`), so `/vendor` never mounted and the GPU ZAP shader and DSP firmware were missing (`bitra-vendor: vendor image (super partition) not found` in the rootfs log). Found by RAM-booting the test image `a-32` (userdata itself mounted fine and had grown to 222 GiB). Fix: `mke2fs -b 4096` in `tools/build-super-img.py`; fixed image sha256 `118c6548...826a` flashed alone with `fastboot flash super`.
+- Check for every future image of ours: ext4 block size must be 4096 on this phone.
+
 ## Release build, first implementation (this session)
 - `scripts/build_mainline_boot.py NAME --release` now uses a separate minimal initramfs (`RELEASE_INIT`): watchdog petting, logo, wait for `bitra.root`, mount, keep pstore, `switch_root`, reboot after 120 s. It carries only busybox, firmware and the logo (no gadget, telnetd/udhcpd, `bitra-switchroot`, reboot helper, DRM/evtest/failnth tools, soak script, wpa_supplicant/iw/bluez tools). Built as `releases/mainline-boot-11.img`.
 - `scripts/build_alpine_rootfs.py --release` leaves out `bitra-net`, `bitra-telnetd`, `bitra-udhcpd`, `bitra-diag` (the `TEST_ONLY_SERVICES`).

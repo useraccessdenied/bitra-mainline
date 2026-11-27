@@ -34,7 +34,7 @@ def main():
     if not a.skip_rootfs:
         raw = rel / f"userdata-{a.version}.raw"
         subprocess.run([PY, str(ROOT / "scripts/build_alpine_rootfs.py"), "--release", "--size-mb", str(a.rootfs_size_mb), "--out", str(raw)], check=True)
-        subprocess.run(["img2simg", str(raw), str(out / "userdata.img")], check=True)
+        subprocess.run([PY, str(ROOT / "tools/mksparse.py"), str(raw), str(out / "userdata.img")], check=True)   # RAW chunks only (never DONT_CARE): safe over an un-erased partition
     cmd = [PY, str(ROOT / "tools/build-super-img.py"), "--rom-zip", a.rom_zip, "-o", str(out / "super.img")]
     if a.firmware_zip:
         cmd += ["--firmware-zip", a.firmware_zip]
