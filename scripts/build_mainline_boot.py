@@ -206,6 +206,46 @@ def _cpio(entries):
     X = _st.S_IFREG | 0o755
     return _orig_cpio(entries + firmware_entries() + alpine_entries() + [("bin/bitra-reboot", X, _helper, None), ("bin/bitra-switchroot", X, BITRA_SWITCHROOT, None), ("bin/bitra-drm", X, _drm, None), ("bin/bitra-evtest", X, _evtest, None), ("bin/bitra-failnth", X, _failnth, None), ("bin/soak.sh", X, (ROOT / "tools/soak.sh").read_bytes(), None), ("bin/systemctl", X, SYSTEMCTL_SHIM, None)])
 b.cpio_newc = _cpio
+# Release initramfs (--release): no USB gadget, no telnet/DHCP, no shell, no test tools. It pets the watchdog, draws the boot logo on the panel,
+# waits for the root partition (bitra.root=NAME), mounts it, keeps the previous boot's pstore, and switch_roots. If the root never appears it
+# reboots after 120 s (nothing to log in to). Recovery is the bootloader (fastboot with the key combination).
+RELEASE_INIT = r'''#!/bin/busybox sh
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+/bin/busybox --install -s /bin 2>/dev/null
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /pstore /config /newroot
+mount -t pstore pstore /pstore 2>/dev/null
+( exec 3>/dev/watchdog0 2>/dev/null || exec 3>/dev/watchdog; while :; do echo . >&3; sleep 4; done ) &
+# boot logo as soon as the panel's framebuffer exists (the msm driver probes after ~10-25 s)
+( i=0; while [ ! -e /dev/fb0 ] && [ $i -lt 120 ]; do sleep 1; i=$((i+1)); done; [ -e /dev/fb0 ] && gunzip -c /logo.raw.gz > /dev/fb0 ) &
+CMDROOT=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^bitra.root=//p')
+n=0
+while [ $n -lt 120 ]; do
+  DEV=
+  for d in /sys/class/block/sd*; do grep -qx "PARTNAME=$CMDROOT" $d/uevent 2>/dev/null && DEV=/dev/${d##*/}; done
+  if [ -n "$DEV" ] && mount -t ext4 -o rw,noatime "$DEV" /newroot; then
+    P=/newroot/var/lib/pstore/early-$(cut -d. -f1 /proc/uptime); mkdir -p $P; cp /pstore/* $P/ 2>/dev/null
+    mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/config /newroot/pstore /newroot/run
+    mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /newroot/run
+    for m in proc sys dev config pstore; do mount --move /$m /newroot/$m; done
+    exec switch_root /newroot /sbin/init
+  fi
+  n=$((n+1)); sleep 1
+done
+echo b > /proc/sysrq-trigger
+'''
+if sys.argv[2:3] == ["--release"]:
+    import importlib.util
+    _s = importlib.util.spec_from_file_location("mkbootlogo", ROOT / "tools/make-boot-logo.py")
+    _m = importlib.util.module_from_spec(_s); _s.loader.exec_module(_m)
+    _logo = _m.make(os.environ.get("BOOT_LOGO_PNG"))
+    b.INIT = RELEASE_INIT
+    def _cpio_release(entries):
+        import stat as _st
+        return _orig_cpio(entries + firmware_entries() + [("logo.raw.gz", _st.S_IFREG | 0o644, _logo, None)])
+    b.cpio_newc = _cpio_release
 MAIN = Path(os.environ.get("MAINLINE_OUT", BITRA / "roms/mainline/out")) / "arch/arm64/boot"
 name = sys.argv[1]
 extra = "clk_ignore_unused pd_ignore_unused panic=0 consoleblank=0 earlycon=efifb keep_bootcon fw_devlink.sync_state=strict loglevel=4"

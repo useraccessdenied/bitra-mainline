@@ -148,6 +148,8 @@ start() {
 }
 """
 
+TEST_ONLY_SERVICES = ("bitra-net", "bitra-telnetd", "bitra-udhcpd", "bitra-diag")
+
 BITRA_DIAG = """#!/sbin/openrc-run
 description="print network/service state into /etc/issue so it shows above the console login prompt"
 depend() { after *; }
@@ -338,6 +340,8 @@ def inner(a):
                      ("hostname", "boot"), ("bitra-time", "boot"), ("bitra-pstore", "boot"), ("sysctl", "boot"), ("bootmisc", "boot"), ("syslog", "boot"),
                      ("bitra-growfs", "boot"), ("bluetooth", "default"), ("bitra-net", "default"), ("bitra-telnetd", "default"), ("bitra-udhcpd", "default"), ("bitra-diag", "default"), ("sshd", "default"), ("dbus", "default"), ("hexagonrpcd-sdsp", "default"), ("bitra-sensors", "default"),
                      ("mount-ro", "shutdown"), ("killprocs", "shutdown"), ("savecache", "shutdown")]:
+        if RELEASE and svc in TEST_ONLY_SERVICES:
+            continue   # release: no USB-NCM link, telnet shell, DHCP server or diagnostics on the panel; test images keep them
         if (root / "etc/init.d" / svc).exists():
             chroot("/sbin/rc-update", "add", svc, lvl)
     if RELEASE:
@@ -438,7 +442,7 @@ def main():
     ap.add_argument("--branch", default="v3.24")
     ap.add_argument("--size-mb", type=int, default=1280)
     ap.add_argument("--out", default=str(ROOT / "releases/alpine-rootfs.ext4"))
-    ap.add_argument("--release", action="store_true", help="production profile: no login prompt on the panel (no getty), root password locked")
+    ap.add_argument("--release", action="store_true", help="production profile: no login prompt on the panel (no getty), root password locked, no USB-NCM/telnet/DHCP/diag services")
     a = ap.parse_args()
     global RELEASE
     RELEASE = a.release
