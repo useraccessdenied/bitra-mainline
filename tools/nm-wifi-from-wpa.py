@@ -7,9 +7,14 @@ made = 0
 for b in blocks:
     ssid = re.search(r'ssid="([^"]+)"', b)
     psk = re.search(r'psk=(?:"([^"]+)"|([0-9a-fA-F]{64}))', b)
-    if not ssid or not psk:
+    plain = re.search(r'^\s*#psk="([^"]+)"', b, re.M)   # wpa_passphrase leaves the passphrase in a comment next to the hashed key
+    if not ssid or not (psk or plain):
         continue
-    secret = psk.group(1) or psk.group(2)
+    # A raw 64-hex key only works for WPA2-PSK: WPA3 (SAE-only) access points need the passphrase, otherwise wpa_supplicant scans forever and NetworkManager
+    # reports "ssid-not-found" / "The Wi-Fi network could not be found" (docs/35). Prefer the passphrase.
+    secret = plain.group(1) if plain else (psk.group(1) or psk.group(2))
+    if not plain and not psk.group(1):
+        print("WARNING:", ssid.group(1), "has only a raw 64-hex key: fine for WPA2, will NOT connect to a WPA3/SAE-only network; add the passphrase")
     prio = re.search(r"priority=(\d+)", b)
     name = "bitra-" + ssid.group(1)
     subprocess.run(["nmcli", "connection", "delete", name], capture_output=True)

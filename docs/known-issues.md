@@ -21,7 +21,7 @@ charging control, suspend/resume, standalone boot. See docs/20 for the order.
 - `fastboot` entered with hardware keys makes ABL refuse images ("Load Error"); use `to-fastboot` from the running OS.
 
 ## Connectivity (2026-11-21)
-- Wi-Fi: scan stuck ("Resource busy") after switching networks with `wpa_cli select_network`; recover with `ip link set wlan0 down/up`. Investigate (ath11k scan abort after roam/disconnect).
+- Wi-Fi: the old "scan stuck (Resource busy)" report was a WPA3-only network with a raw-key profile, not ath11k (docs/35, 2026-11-27).
 - Wi-Fi/Bluetooth addresses: the stock addresses were not found; both are now stable per-phone addresses derived from the SoC serial (docs/35, docs/36).
 - Wi-Fi: no OEM board data (BDF) used yet; generic board-2.bin worked. Check power/suspend, regulatory (self-managed US), roaming, coex with Bluetooth.
 - Bluetooth: LE scanning unverified; pairing/A2DP/audio not tried; needs bluetoothd (dbus) or a tty-capable btmgmt in the initramfs.
